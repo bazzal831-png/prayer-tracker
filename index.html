@@ -50,13 +50,12 @@
         .prayer-info h3 { margin: 0 0 5px 0; font-size: 1.1rem; }
         .prayer-time { font-size: 0.9rem; color: #7f8c8d; font-weight: bold; }
 
-        /* الألوان الجديدة للأزرار */
         .action-btn { padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; color: white; transition: 0.3s; }
-        .action-btn.adaa { background-color: var(--accent); } /* أزرق: متاح للأداء الآن */
-        .action-btn.completed-adaa { background-color: var(--success); } /* أخضر: تمت الصلاة أداءً */
-        .action-btn.qadaa { background-color: var(--danger); } /* أحمر: يجب قضاؤها */
-        .action-btn.completed-qadaa { background-color: var(--warning); color: #fff; } /* برتقالي: تم القضاء */
-        .action-btn.future { background-color: var(--disabled); cursor: not-allowed; } /* رمادي: للمستقبل */
+        .action-btn.adaa { background-color: var(--accent); } 
+        .action-btn.completed-adaa { background-color: var(--success); } 
+        .action-btn.qadaa { background-color: var(--danger); } 
+        .action-btn.completed-qadaa { background-color: var(--warning); color: #fff; } 
+        .action-btn.future { background-color: var(--disabled); cursor: not-allowed; } 
         .action-btn.legacy-completed { background-color: var(--success); }
 
         .stats-grid { display: flex; flex-wrap: wrap; gap: 30px; justify-content: center; margin-top: 20px;}
@@ -66,8 +65,10 @@
         .shadow-box-fg span.title { font-size: 1rem; color: var(--primary); font-weight: bold; }
         .shadow-box-fg span.num { font-size: 1.8rem; color: var(--danger); font-weight: bold; margin-top: 5px; }
 
-        .file-upload-btn { background-color: var(--secondary); color: white; padding: 10px; border-radius: 5px; cursor: pointer; display: block; text-align: center; margin-bottom: 15px; }
+        .file-upload-btn { background-color: var(--secondary); color: white; padding: 10px; border-radius: 5px; cursor: pointer; display: block; text-align: center; margin-bottom: 10px; font-weight: bold; }
         input[type="file"] { display: none; }
+        
+        .section-title { font-size: 1.1rem; color: var(--primary); border-bottom: 2px solid #eee; padding-bottom: 5px; margin-top: 20px; margin-bottom: 15px; text-align: right; }
     </style>
 </head>
 <body>
@@ -102,14 +103,32 @@
     <div class="modal" id="settings-modal">
         <div class="modal-content">
             <button class="close-btn" onclick="closeModal('settings-modal')">إغلاق</button>
-            <h2>الإعدادات والإحصائيات</h2>
+            <h2>الإعدادات والنسخ الاحتياطي</h2>
+            
+            <div class="section-title">🗓️ مواقيت الصلوات (بعلبك)</div>
             <label class="file-upload-btn">
                 📥 استيراد مواقيت بعلبك (ملف JSON)
                 <input type="file" accept=".json" onchange="importJSON(event)">
             </label>
-            <button class="settings-btn" style="background: var(--danger); width: 100%; margin-bottom: 20px;" onclick="resetData()">تصفير البيانات (Reset)</button>
+            <button class="settings-btn" style="width: 100%; background-color: var(--secondary);" onclick="exportMonthTimings()">
+                📤 تصدير أوقات الشهر المعروض حالياً
+            </button>
+
+            <div class="section-title">💾 بياناتي وسجل العبادات الشخصي</div>
+            <button class="settings-btn" style="background: var(--success); width: 100%; margin-bottom: 10px;" onclick="exportUserData()">
+                📤 حفظ نسخة احتياطية من سجل صلواتي
+            </button>
+            <label class="file-upload-btn" style="background-color: var(--accent);">
+                📥 استعادة سجل صلواتي من ملف احتياطي
+                <input type="file" accept=".json" onchange="importUserData(event)">
+            </label>
+            
+            <button class="settings-btn" style="background: var(--danger); width: 100%; margin-top: 15px; margin-bottom: 20px;" onclick="resetData()">
+                ⚠️ تصفير كافة البيانات (Reset)
+            </button>
+            
             <hr>
-            <h3>إحصائيات القضاء</h3>
+            <h3>إحصائيات القضاء لشهر <span id="stats-month-name"></span></h3>
             <p style="font-size: 0.85rem; color: #7f8c8d;">المربع الأمامي: قضاء مطلوب | الخلفي: مقضية</p>
             <div class="stats-grid" id="stats-container"></div>
         </div>
@@ -152,8 +171,8 @@
                 try {
                     const json = JSON.parse(e.target.result);
                     localStorage.setItem('baalbekTimings', JSON.stringify(json));
-                    customTimings = json; alert("تم الاستيراد بنجاح!");
-                } catch (err) { alert("حدث خطأ في ملف JSON."); }
+                    customTimings = json; alert("تم استيراد مواقيت الأشهر بنجاح!");
+                } catch (err) { alert("حدث خطأ في ملف JSON الخاص بالمواقيت."); }
             };
             reader.readAsText(file);
         }
@@ -203,15 +222,13 @@
 
                 const div = document.createElement('div'); div.className = 'prayer-item';
                 
-                // مفتاح العرض: أي وقت سيظهر كنص بجانب اسم الصلاة (للإبقاء على عرض وقت الفضيلة أو الأساسي)
                 let displayKey = p.id;
                 if (p.id === 'ghufaila') displayKey = 'maghrib';
                 if (p.id === 'night') displayKey = 'isha';
 
-                // مفتاح المنطق: متى تفتح الصلاة وتصبح متاحة للأداء
                 let logicKey = p.id;
-                if (p.id === 'asr') logicKey = 'dhuhr'; // يفتح العصر مع الظهر
-                if (p.id === 'isha' || p.id === 'ghufaila' || p.id === 'night') logicKey = 'maghrib'; // تفتح العشاء والغفيلة والليل مع المغرب
+                if (p.id === 'asr') logicKey = 'dhuhr'; 
+                if (p.id === 'isha' || p.id === 'ghufaila' || p.id === 'night') logicKey = 'maghrib'; 
 
                 let timeDisplay = '';
                 let startMin = -1; let endMin = -1;
@@ -247,14 +264,14 @@
                         if (startMin !== -1 && nowMin < startMin) {
                             disabled = true; btnClass += ' future'; btnText = 'لم يحن وقتها';
                         } else if (startMin !== -1 && nowMin <= endMin) {
-                            btnClass += ' adaa'; btnText = 'تسجيل أداء'; // زر أزرق
+                            btnClass += ' adaa'; btnText = 'تسجيل أداء'; 
                             clickAction = `togglePrayer('${dateStr}', '${p.id}', 'adaa')`;
                         } else {
-                            btnClass += ' qadaa'; btnText = 'يجب قضاؤها'; // زر أحمر
+                            btnClass += ' qadaa'; btnText = 'يجب قضاؤها'; 
                             clickAction = `togglePrayer('${dateStr}', '${p.id}', 'qadaa')`;
                         }
                     } else {
-                        btnClass += ' qadaa'; btnText = 'يجب قضاؤها'; // زر أحمر للأيام السابقة
+                        btnClass += ' qadaa'; btnText = 'يجب قضاؤها'; 
                         clickAction = `togglePrayer('${dateStr}', '${p.id}', 'qadaa')`;
                     }
                 }
@@ -284,6 +301,7 @@
         }
 
         function generateStats() {
+            document.getElementById('stats-month-name').innerText = monthNamesEn[currentViewMonth - 1];
             const container = document.getElementById('stats-container');
             container.innerHTML = '';
             const fardPrayers = prayerNames.filter(p => p.type === 'fard');
@@ -320,14 +338,82 @@
         }
 
         function saveData() { localStorage.setItem('prayerData_v1', JSON.stringify(appData)); }
+        
         function resetData() {
-            if(confirm("تحذير: هل تريد حقاً مسح كل سجلاتك السابقة؟")) {
+            if(confirm("تحذير خطير: هل تريد حقاً مسح كل سجلاتك السابقة من الجهاز وتصفير التطبيق؟")) {
                 localStorage.removeItem('prayerData_v1'); appData = {}; renderCalendar(); closeModal('settings-modal');
             }
         }
 
         function openSettings() { generateStats(); document.getElementById('settings-modal').style.display = 'flex'; }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        
+        /* ------------------ الخصائص الجديدة المضافة للحفاظ على البيانات لفترة طويلة ------------------ */
+
+        // دالة مساعدة عامة لتحميل الكائنات كملفات JSON
+        function downloadJSON(data, filename) {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // 1. تصدير أوقات الشهر المعروض حالياً على الشاشة فقط
+        function exportMonthTimings() {
+            const monthPrefix = `${currentViewYear}-${String(currentViewMonth).padStart(2, '0')}`;
+            const monthData = {};
+            
+            for (const date in customTimings) {
+                if (date.startsWith(monthPrefix)) {
+                    monthData[date] = customTimings[date];
+                }
+            }
+
+            if (Object.keys(monthData).length === 0) {
+                alert(`لا توجد أوقات مسجلة في التطبيق لشهر ${monthNamesEn[currentViewMonth - 1]} ${currentViewYear} لتصديرها.`);
+                return;
+            }
+
+            downloadJSON(monthData, `Timings_Baalbek_${monthPrefix}.json`);
+        }
+
+        // 2. تصدير السجل الشخصي بالكامل لصلوات المستخدم كنسخة احتياطية آمنة
+        function exportUserData() {
+            if (Object.keys(appData).length === 0) {
+                alert("سجل صلواتك فارغ حالياً، لا توجد بيانات لتصديرها.");
+                return;
+            }
+            const today = formatDate(new Date());
+            downloadJSON(appData, `MyPrayers_Backup_${today}.json`);
+        }
+
+        // 3. استيراد واستعادة السجل الشخصي للصلوات من ملف محفوظ سابقاً
+        function importUserData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    if (typeof json === 'object' && json !== null) {
+                        appData = json;
+                        saveData();
+                        renderCalendar();
+                        generateStats();
+                        alert("تمت استعادة سجل صلواتك الشخصي بنجاح وتحديث التقويم!");
+                    } else {
+                        alert("صيغة الملف غير صحيحة.");
+                    }
+                } catch (err) { alert("حدث خطأ أثناء قراءة ملف السجلات الشخصية."); }
+            };
+            reader.readAsText(file);
+        }
+
         window.onload = () => { renderCalendar(); };
     </script>
 </body>
