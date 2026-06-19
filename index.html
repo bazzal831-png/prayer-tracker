@@ -46,13 +46,47 @@
         .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; direction: ltr; }
         #current-month-display { margin: 0; }
 
+        /* شبكة التقويم المحدثة (7 أعمدة) */
         .calendar-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; direction: ltr;
+            display: grid; 
+            grid-template-columns: repeat(7, 1fr); 
+            gap: 5px; 
+            direction: ltr; /* لتبدأ الأعمدة من اليسار (الأحد) إلى اليمين (السبت) */
         }
 
+        /* تنسيق عناوين أيام الأسبوع */
+        .week-day-header {
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.8rem;
+            color: var(--secondary);
+            padding: 5px 0;
+            background-color: #eef2f5;
+            border-radius: 4px;
+            margin-bottom: 5px;
+        }
+
+        /* المربعات الفارغة للمحاذاة */
+        .empty-day {
+            visibility: hidden;
+        }
+
+        /* تعديل حجم بطاقة اليوم لتناسب الشاشات الصغيرة */
         .day-card {
-            background: white; padding: 15px; border-radius: 8px; text-align: center;
-            cursor: pointer; box-shadow: 0 2px 4px var(--shadow); transition: transform 0.2s; border: 2px solid transparent;
+            background: white; 
+            padding: 8px 2px; 
+            border-radius: 6px; 
+            text-align: center;
+            cursor: pointer; 
+            box-shadow: 0 2px 4px var(--shadow); 
+            transition: transform 0.2s; 
+            border: 2px solid transparent;
+        }
+
+        /* تصغير خط أرقام الأيام */
+        .day-card h3 {
+            margin: 0;
+            font-size: 0.9rem;
         }
 
         .day-card:hover { transform: scale(1.05); border-color: var(--accent); }
@@ -150,7 +184,6 @@
     </div>
 
     <script>
-        // تسجيل الـ Service Worker لتشغيل التطبيق بدون إنترنت
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js')
             .then(reg => console.log('Service Worker Registered!', reg))
@@ -193,11 +226,32 @@
             reader.readAsText(file);
         }
 
+        // تحديث دالة بناء التقويم لتشمل أسماء الأيام والمحاذاة الصحيحة
         function renderCalendar() {
             document.getElementById('current-month-display').innerText = `${monthNamesEn[currentViewMonth - 1]} ${currentViewYear}`;
             const grid = document.getElementById('calendar-grid');
             grid.innerHTML = '';
 
+            // 1. طباعة أسماء أيام الأسبوع في الصف العلوي
+            const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            weekDays.forEach(day => {
+                const header = document.createElement('div');
+                header.className = 'week-day-header';
+                header.innerText = day;
+                grid.appendChild(header);
+            });
+
+            // 2. حساب اليوم الأول من الشهر لمعرفة الفراغات المطلوبة للمحاذاة
+            const firstDayIndex = new Date(currentViewYear, currentViewMonth - 1, 1).getDay();
+            
+            // إضافة مربعات فارغة غير مرئية قبل بداية الشهر
+            for (let j = 0; j < firstDayIndex; j++) {
+                const emptyCard = document.createElement('div');
+                emptyCard.className = 'empty-day';
+                grid.appendChild(emptyCard);
+            }
+
+            // 3. طباعة أيام الشهر الفعلي
             const daysInMonth = new Date(currentViewYear, currentViewMonth, 0).getDate();
             const todayStr = formatDate(new Date());
 
