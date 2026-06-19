@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2c3e50">
+    <link rel="manifest" href="./manifest.json">
+    <title>مراقب الصلوات - بعلبك</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --primary: #2c3e50;
+            --secondary: #34495e;
+            --accent: #2980b9;
+            --success: #27ae60;
+            --danger: #c0392b;
+            --text-light: #ecf0f1;
+            --text-dark: #2c3e50;
+            --shadow: rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            margin: 0; padding: 0;
+        }
+
+        header {
+            background-color: var(--primary);
+            color: var(--text-light);
+            padding: 15px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 5px var(--shadow);
+        }
+
+        h1 { margin: 0; font-size: 1.5rem; }
+
+        .settings-btn {
+            background-color: var(--accent); color: white;
+            border: none; padding: 10px 15px; border-radius: 5px;
+            cursor: pointer; font-weight: bold;
+        }
+
+        .container { padding: 20px; max-width: 800px; margin: auto; }
+        .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; direction: ltr; }
+        #current-month-display { margin: 0; }
+
+        .calendar-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; direction: ltr;
+        }
+
+        .day-card {
+            background: white; padding: 15px; border-radius: 8px; text-align: center;
+            cursor: pointer; box-shadow: 0 2px 4px var(--shadow); transition: transform 0.2s; border: 2px solid transparent;
+        }
+
+        .day-card:hover { transform: scale(1.05); border-color: var(--accent); }
+        .day-card.today { background-color: #e8f4f8; border-color: var(--accent); }
+
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center;
+        }
+
+        .modal-content {
+            background: white; padding: 20px; border-radius: 10px;
+            width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;
+        }
+
+        .close-btn {
+            background: var(--danger); color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; float: left;
+        }
+
+        .prayer-item {
+            background: #f9f9f9; margin: 10px 0; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-right: 4px solid var(--accent);
+        }
+
+        .prayer-info h3 { margin: 0 0 5px 0; font-size: 1.1rem; }
+        .prayer-time { font-size: 0.9rem; color: #7f8c8d; font-weight: bold; }
+
+        .action-btn {
+            padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; background-color: var(--accent); color: white;
+        }
+        .action-btn.completed { background-color: var(--success); cursor: not-allowed; }
+        .action-btn.qadaa { background-color: var(--danger); }
+
+        .stats-grid { display: flex; flex-wrap: wrap; gap: 30px; justify-content: center; margin-top: 20px;}
+        .shadow-box-container { position: relative; width: 120px; height: 120px; }
+        .shadow-box-bg {
+            position: absolute; top: 15px; left: -15px; width: 100%; height: 100%;
+            background-color: #d5f5e3; border: 2px dashed var(--success); border-radius: 10px;
+            z-index: 1; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px; color: var(--success); font-weight: bold; font-size: 0.9rem;
+        }
+        .shadow-box-fg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: white; border: 2px solid var(--danger); border-radius: 10px;
+            z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 4px 8px var(--shadow);
+        }
+        .shadow-box-fg span.title { font-size: 1rem; color: var(--primary); font-weight: bold; }
+        .shadow-box-fg span.num { font-size: 1.8rem; color: var(--danger); font-weight: bold; margin-top: 5px; }
+
+        .file-upload-btn {
+            background-color: var(--secondary); color: white; padding: 10px; border-radius: 5px; cursor: pointer; display: block; text-align: center; margin-bottom: 15px;
+        }
+        input[type="file"] { display: none; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>مراقب الصلوات - بعلبك 🗓️</h1>
+        <button class="settings-btn" onclick="openSettings()">الإعدادات</button>
+    </header>
+
+    <div class="container">
+        <div class="controls">
+            <button onclick="changeMonth(-1)">Previous</button>
+            <h2 id="current-month-display">June 2026</h2>
+            <button onclick="changeMonth(1)">Next</button>
+        </div>
+        <div class="calendar-grid" id="calendar-grid"></div>
+    </div>
+
+    <div class="modal" id="day-modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeModal('day-modal')">إغلاق</button>
+            <h2 id="modal-date-title">تفاصيل اليوم</h2>
+            <div id="prayers-list"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="settings-modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeModal('settings-modal')">إغلاق</button>
+            <h2>الإعدادات والإحصائيات</h2>
+            
+            <label class="file-upload-btn">
+                📥 استيراد مواقيت بعلبك (ملف JSON)
+                <input type="file" accept=".json" onchange="importJSON(event)">
+            </label>
+
+            <button class="settings-btn" style="background: var(--danger); width: 100%; margin-bottom: 20px;" onclick="resetData()">تصفير البيانات (Reset)</button>
+
+            <hr>
+            <h3>إحصائيات القضاء</h3>
+            <p style="font-size: 0.85rem; color: #7f8c8d;">المربع الأمامي: قضاء مطلوب | الخلفي: مقضية</p>
+            <div class="stats-grid" id="stats-container"></div>
+        </div>
+    </div>
+
+    <script>
+        // تسجيل الـ Service Worker لتشغيل التطبيق بدون إنترنت
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('Service Worker Registered!', reg))
+            .catch(err => console.error('Service Worker registration failed', err));
+        }
+
+        const START_DATE_STR = '2026-06-19'; 
+        let currentViewMonth = new Date().getMonth() + 1;
+        let currentViewYear = new Date().getFullYear();
+        
+        const monthNamesEn = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+        let appData = JSON.parse(localStorage.getItem('prayerData_v1')) || {};
+        let customTimings = JSON.parse(localStorage.getItem('baalbekTimings')) || {};
+
+        const prayerNames = [
+            { id: 'fajr', name: 'الصبح', type: 'fard' },
+            { id: 'dhuhr', name: 'الظهر', type: 'fard' },
+            { id: 'asr', name: 'العصر', type: 'fard' },
+            { id: 'maghrib', name: 'المغرب', type: 'fard' },
+            { id: 'ghufaila', name: 'صلاة الغفيلة', type: 'nafl' },
+            { id: 'isha', name: 'العشاء', type: 'fard' },
+            { id: 'night', name: 'صلاة الليل', type: 'nafl' }
+        ];
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    localStorage.setItem('baalbekTimings', JSON.stringify(json));
+                    customTimings = json;
+                    alert("تم استيراد مواقيت بعلبك بنجاح!");
+                } catch (err) {
+                    alert("حدث خطأ! تأكد من أن ملف الـ JSON مكتوب بطريقة صحيحة.");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function renderCalendar() {
+            document.getElementById('current-month-display').innerText = `${monthNamesEn[currentViewMonth - 1]} ${currentViewYear}`;
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '';
+
+            const daysInMonth = new Date(currentViewYear, currentViewMonth, 0).getDate();
+            const todayStr = formatDate(new Date());
+
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dayStr = `${currentViewYear}-${String(currentViewMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                const card = document.createElement('div');
+                card.className = 'day-card';
+                if (dayStr === todayStr) card.classList.add('today');
+                
+                card.innerHTML = `<h3>${i}</h3>`;
+                card.onclick = () => openDay(dayStr);
+                grid.appendChild(card);
+            }
+        }
+
+        function openDay(dateStr) {
+            const list = document.getElementById('prayers-list');
+            document.getElementById('modal-date-title').innerText = `صلوات يوم: ${dateStr}`;
+            list.innerHTML = '';
+
+            const todayStr = formatDate(new Date());
+            const dayTimings = customTimings[dateStr] || null;
+
+            const isFuture = dateStr > todayStr;
+            const isToday = dateStr === todayStr;
+            const isNearPast = dateStr < todayStr && dateStr >= START_DATE_STR;
+            const isFarPast = dateStr < START_DATE_STR;
+
+            if (!appData[dateStr]) appData[dateStr] = {};
+
+            prayerNames.forEach(p => {
+                const isCompleted = appData[dateStr][p.id] === true;
+                
+                if (isFarPast && p.type === 'nafl') return;
+                if (isNearPast && p.type === 'nafl' && !isCompleted) return;
+
+                const div = document.createElement('div');
+                div.className = 'prayer-item';
+                
+                let timeDisplay = '';
+                if ((isToday || isFuture) && dayTimings) {
+                    let tKey = p.id.split('_')[0]; 
+                    if (p.id === 'ghufaila') tKey = 'maghrib';
+                    if (p.id === 'night') tKey = 'isha';
+                    if (dayTimings[tKey]) {
+                        timeDisplay = `<div class="prayer-time">⌚ ${dayTimings[tKey]}</div>`;
+                    }
+                }
+
+                let actionHTML = '';
+                if (!isFuture) {
+                    let btnClass = 'action-btn';
+                    let btnText = 'إتمام الصلاة';
+                    let isQadaa = false;
+
+                    if (isCompleted) {
+                        btnClass += ' completed';
+                        btnText = 'مقضية / تامة ✔';
+                    } else if (dateStr < todayStr && p.type === 'fard') {
+                        btnClass += ' qadaa';
+                        btnText = 'قضاء الصلاة';
+                        isQadaa = true;
+                    }
+
+                    actionHTML = `<button class="${btnClass}" onclick="togglePrayer('${dateStr}', '${p.id}', ${isQadaa})" ${isCompleted ? 'disabled' : ''}>${btnText}</button>`;
+                }
+
+                div.innerHTML = `
+                    <div class="prayer-info">
+                        <h3>${p.name}</h3>
+                        ${timeDisplay}
+                    </div>
+                    ${actionHTML}
+                `;
+                list.appendChild(div);
+            });
+            document.getElementById('day-modal').style.display = 'flex';
+        }
+
+        function togglePrayer(dateStr, prayerId, isQadaa) {
+            let msg = isQadaa ? "هذه الصلاة قضاء. هل تريد تأكيد قضائها الآن؟" : "هل أتممت هذه الصلاة فعلاً؟";
+            if (confirm(msg)) {
+                appData[dateStr][prayerId] = true;
+                saveData();
+                openDay(dateStr);
+            }
+        }
+
+        function generateStats() {
+            const container = document.getElementById('stats-container');
+            container.innerHTML = '';
+            const fardPrayers = prayerNames.filter(p => p.type === 'fard');
+            const todayStr = formatDate(new Date());
+            
+            fardPrayers.forEach(p => {
+                let required = 0; let completed = 0;
+                const daysInMonth = new Date(currentViewYear, currentViewMonth, 0).getDate();
+                
+                for(let i=1; i<=daysInMonth; i++) {
+                    const dStr = `${currentViewYear}-${String(currentViewMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    if(dStr < todayStr) {
+                        if(appData[dStr] && appData[dStr][p.id] === true) completed++;
+                        else required++;
+                    }
+                }
+                container.innerHTML += `
+                    <div class="shadow-box-container">
+                        <div class="shadow-box-bg">أُنجز: ${completed}</div>
+                        <div class="shadow-box-fg">
+                            <span class="title">${p.name}</span>
+                            <span class="num">${required}</span>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        function changeMonth(step) {
+            currentViewMonth += step;
+            if (currentViewMonth > 12) { currentViewMonth = 1; currentViewYear++; }
+            if (currentViewMonth < 1) { currentViewMonth = 12; currentViewYear--; }
+            renderCalendar();
+        }
+
+        function formatDate(date) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function saveData() { localStorage.setItem('prayerData_v1', JSON.stringify(appData)); }
+        function resetData() {
+            if(confirm("تحذير: هل تريد حقاً مسح كل سجلاتك السابقة؟")) {
+                localStorage.removeItem('prayerData_v1');
+                appData = {}; renderCalendar(); closeModal('settings-modal');
+            }
+        }
+
+        function openSettings() { generateStats(); document.getElementById('settings-modal').style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        window.onload = () => { renderCalendar(); };
+    </script>
+</body>
+</html>
