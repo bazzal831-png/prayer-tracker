@@ -113,7 +113,8 @@
                 <input type="file" accept=".json" onchange="importJSON(event)">
             </label>
 
-            <div class="section-title">⚡ تسجيل القضاء المجمع (سريع)</div>
+            <div class="section-title">⚡ تسجيل القضاء المجمع (رجوع بالزمن)</div>
+            <p style="font-size: 0.8rem; color: #7f8c8d; margin-top: -10px;">سيقوم النظام بتعبئة الفраغات للوراء تلقائياً، ويتخطى الأيام المسجلة سابقاً.</p>
             <div class="flex-row">
                 <input type="number" id="bulk-year" class="styled-input" placeholder="السنة" style="width: 30%;">
                 <select id="bulk-month" class="styled-input" style="width: 35%;">
@@ -139,7 +140,7 @@
                 </select>
             </div>
             <div class="flex-row">
-                <input type="number" id="bulk-count" class="styled-input" placeholder="عدد الأيام المقضية (مثال: 10)" style="width: 60%;" min="1">
+                <input type="number" id="bulk-count" class="styled-input" placeholder="عدد الصلوات (مثال: 33)" style="width: 60%;" min="1">
                 <button class="settings-btn" style="width: 40%; background-color: var(--warning);" onclick="applyBulkQadaa()">سجل القضاء ✔</button>
             </div>
 
@@ -378,52 +379,71 @@
             generateStats(); 
             document.getElementById('settings-modal').style.display = 'flex'; 
             
-            // تجهيز خانة السنة والشهر في "القضاء المجمع" بناءً على الشهر المعروض حالياً أمامك
             document.getElementById('bulk-year').value = currentViewYear;
             document.getElementById('bulk-month').value = currentViewMonth;
         }
 
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         
-        // ------------- دالة القضاء السريع (المجمع) -------------
+        // ------------- دالة القضاء السريع والتراجعي مع التقرير الذكي -------------
         function applyBulkQadaa() {
-            const year = parseInt(document.getElementById('bulk-year').value);
-            const month = parseInt(document.getElementById('bulk-month').value);
+            const startYear = parseInt(document.getElementById('bulk-year').value);
+            const startMonth = parseInt(document.getElementById('bulk-month').value);
             const prayerId = document.getElementById('bulk-prayer').value;
             const countInput = document.getElementById('bulk-count');
-            let count = parseInt(countInput.value);
+            let remainingCount = parseInt(countInput.value);
 
-            if (!year || !month || !prayerId || isNaN(count) || count <= 0) {
+            if (!startYear || !startMonth || !prayerId || isNaN(remainingCount) || remainingCount <= 0) {
                 alert("الرجاء إدخال جميع البيانات وعدد الأيام بشكل صحيح.");
                 return;
             }
 
-            // حساب عدد الأيام الفعلي في هذا الشهر المحدد
-            const daysInMonth = new Date(year, month, 0).getDate();
-
-            // منع إدخال رقم أكبر من عدد أيام الشهر
-            if (count > daysInMonth) {
-                alert(`عذراً، شهر ${month} لسنة ${year} يحتوي على ${daysInMonth} يوماً فقط.\nأقصى حد للتسجيل في هذا الشهر هو ${daysInMonth}.`);
-                count = daysInMonth;
-                countInput.value = daysInMonth; // تصحيح الرقم في الشاشة
-            }
-
+            const todayStr = formatDate(new Date()); 
             let filledCount = 0;
             
-            // المرور على أيام الشهر لتعبئة القضاء
-            for (let i = 1; i <= daysInMonth; i++) {
-                if (filledCount >= count) break;
-                
-                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-                
-                if (!appData[dateStr]) {
-                    appData[dateStr] = {};
+            let currentYear = startYear;
+            let currentMonth = startMonth;
+            
+            let maxMonthsToSearch = 120; 
+
+            // كائن لتخزين كم صلاة تم إضافتها في كل شهر (لأجل تقرير التوزيع)
+            let distributionReport = {};
+
+            while (remainingCount > 0 && maxMonthsToSearch > 0) {
+                maxMonthsToSearch--;
+                const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+                for (let i = daysInMonth; i >= 1; i--) {
+                    if (remainingCount === 0) break; 
+
+                    const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    
+                    if (dateStr > todayStr) {
+                        continue;
+                    }
+
+                    if (!appData[dateStr]) {
+                        appData[dateStr] = {};
+                    }
+                    
+                    // التعبئة في الخانات الفارغة تماماً (الحماية من الكتابة فوق البيانات القديمة)
+                    if (!appData[dateStr][prayerId]) {
+                        appData[dateStr][prayerId] = 'qadaa';
+                        remainingCount--;
+                        filledCount++;
+
+                        // تسجيل الإضافة في التقرير للشهر الحالي
+                        const monthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+                        distributionReport[monthKey] = (distributionReport[monthKey] || 0) + 1;
+                    }
                 }
-                
-                // نقوم بتسجيل "قضاء" فقط إذا لم تكن مسجلة مسبقاً كـ "أداء"
-                if (appData[dateStr][prayerId] !== 'adaa') {
-                    appData[dateStr][prayerId] = 'qadaa';
-                    filledCount++;
+
+                if (remainingCount > 0) {
+                    currentMonth--;
+                    if (currentMonth === 0) {
+                        currentMonth = 12;
+                        currentYear--;
+                    }
                 }
             }
 
@@ -431,17 +451,19 @@
             renderCalendar();
             generateStats();
             
-            // إظهار نتيجة العملية
-            if (filledCount < count) {
-                alert(`تم تسجيل ${filledCount} صلوات قضاء بنجاح في الفراغات المتاحة.\n(لم يتم تسجيل الباقي لأن بعض أيام الشهر مسجلة كـ "أداء" مسبقاً).`);
-            } else {
-                alert(`تم تسجيل ${filledCount} صلاة قضاء بنجاح!`);
+            // بناء نص التقرير للمستخدم
+            let alertMessage = `✅ تم تسجيل ${filledCount} صلاة قضاء بنجاح دون أي تداخل مع بياناتك السابقة!\n\n📋 تقرير توزيع الصلوات:\n`;
+            for (const key in distributionReport) {
+                const [y, m] = key.split('-');
+                alertMessage += `• شهر ${parseInt(m)} / ${y}: تم شغل ${distributionReport[key]} يوم فارغ.\n`;
             }
             
-            countInput.value = ''; // تفريغ خانة العدد بعد النجاح
+            alert(alertMessage);
+            countInput.value = ''; 
         }
 
-        // دالة مساعدة عامة لتحميل الكائنات كملفات JSON
+        // -------------------------------------------------------------------------
+
         function downloadJSON(data, filename) {
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
