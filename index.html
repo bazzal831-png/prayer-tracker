@@ -68,7 +68,9 @@
         .file-upload-btn { background-color: var(--secondary); color: white; padding: 10px; border-radius: 5px; cursor: pointer; display: block; text-align: center; margin-bottom: 10px; font-weight: bold; }
         input[type="file"] { display: none; }
         
-        .section-title { font-size: 1.1rem; color: var(--primary); border-bottom: 2px solid #eee; padding-bottom: 5px; margin-top: 20px; margin-bottom: 15px; text-align: right; }
+        .section-title { font-size: 1.1rem; color: var(--primary); border-bottom: 2px solid #eee; padding-bottom: 5px; margin-top: 20px; margin-bottom: 15px; text-align: right; font-weight: bold; }
+        .styled-input { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: inherit; font-size: 0.95rem; box-sizing: border-box; }
+        .flex-row { display: flex; gap: 8px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -110,9 +112,36 @@
                 📥 استيراد مواقيت بعلبك (ملف JSON)
                 <input type="file" accept=".json" onchange="importJSON(event)">
             </label>
-            <button class="settings-btn" style="width: 100%; background-color: var(--secondary);" onclick="exportMonthTimings()">
-                📤 تصدير أوقات الشهر المعروض حالياً
-            </button>
+
+            <div class="section-title">⚡ تسجيل القضاء المجمع (سريع)</div>
+            <div class="flex-row">
+                <input type="number" id="bulk-year" class="styled-input" placeholder="السنة" style="width: 30%;">
+                <select id="bulk-month" class="styled-input" style="width: 35%;">
+                    <option value="1">1 (يناير)</option>
+                    <option value="2">2 (فبراير)</option>
+                    <option value="3">3 (مارس)</option>
+                    <option value="4">4 (أبريل)</option>
+                    <option value="5">5 (مايو)</option>
+                    <option value="6">6 (يونيو)</option>
+                    <option value="7">7 (يوليو)</option>
+                    <option value="8">8 (أغسطس)</option>
+                    <option value="9">9 (سبتمبر)</option>
+                    <option value="10">10 (أكتوبر)</option>
+                    <option value="11">11 (نوفمبر)</option>
+                    <option value="12">12 (ديسمبر)</option>
+                </select>
+                <select id="bulk-prayer" class="styled-input" style="width: 35%;">
+                    <option value="fajr">الصبح</option>
+                    <option value="dhuhr">الظهر</option>
+                    <option value="asr">العصر</option>
+                    <option value="maghrib">المغرب</option>
+                    <option value="isha">العشاء</option>
+                </select>
+            </div>
+            <div class="flex-row">
+                <input type="number" id="bulk-count" class="styled-input" placeholder="عدد الأيام المقضية (مثال: 10)" style="width: 60%;" min="1">
+                <button class="settings-btn" style="width: 40%; background-color: var(--warning);" onclick="applyBulkQadaa()">سجل القضاء ✔</button>
+            </div>
 
             <div class="section-title">💾 بياناتي وسجل العبادات الشخصي</div>
             <button class="settings-btn" style="background: var(--success); width: 100%; margin-bottom: 10px;" onclick="exportUserData()">
@@ -345,10 +374,72 @@
             }
         }
 
-        function openSettings() { generateStats(); document.getElementById('settings-modal').style.display = 'flex'; }
+        function openSettings() { 
+            generateStats(); 
+            document.getElementById('settings-modal').style.display = 'flex'; 
+            
+            // تجهيز خانة السنة والشهر في "القضاء المجمع" بناءً على الشهر المعروض حالياً أمامك
+            document.getElementById('bulk-year').value = currentViewYear;
+            document.getElementById('bulk-month').value = currentViewMonth;
+        }
+
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         
-        /* ------------------ الخصائص الجديدة المضافة للحفاظ على البيانات لفترة طويلة ------------------ */
+        // ------------- دالة القضاء السريع (المجمع) -------------
+        function applyBulkQadaa() {
+            const year = parseInt(document.getElementById('bulk-year').value);
+            const month = parseInt(document.getElementById('bulk-month').value);
+            const prayerId = document.getElementById('bulk-prayer').value;
+            const countInput = document.getElementById('bulk-count');
+            let count = parseInt(countInput.value);
+
+            if (!year || !month || !prayerId || isNaN(count) || count <= 0) {
+                alert("الرجاء إدخال جميع البيانات وعدد الأيام بشكل صحيح.");
+                return;
+            }
+
+            // حساب عدد الأيام الفعلي في هذا الشهر المحدد
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            // منع إدخال رقم أكبر من عدد أيام الشهر
+            if (count > daysInMonth) {
+                alert(`عذراً، شهر ${month} لسنة ${year} يحتوي على ${daysInMonth} يوماً فقط.\nأقصى حد للتسجيل في هذا الشهر هو ${daysInMonth}.`);
+                count = daysInMonth;
+                countInput.value = daysInMonth; // تصحيح الرقم في الشاشة
+            }
+
+            let filledCount = 0;
+            
+            // المرور على أيام الشهر لتعبئة القضاء
+            for (let i = 1; i <= daysInMonth; i++) {
+                if (filledCount >= count) break;
+                
+                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                
+                if (!appData[dateStr]) {
+                    appData[dateStr] = {};
+                }
+                
+                // نقوم بتسجيل "قضاء" فقط إذا لم تكن مسجلة مسبقاً كـ "أداء"
+                if (appData[dateStr][prayerId] !== 'adaa') {
+                    appData[dateStr][prayerId] = 'qadaa';
+                    filledCount++;
+                }
+            }
+
+            saveData();
+            renderCalendar();
+            generateStats();
+            
+            // إظهار نتيجة العملية
+            if (filledCount < count) {
+                alert(`تم تسجيل ${filledCount} صلوات قضاء بنجاح في الفراغات المتاحة.\n(لم يتم تسجيل الباقي لأن بعض أيام الشهر مسجلة كـ "أداء" مسبقاً).`);
+            } else {
+                alert(`تم تسجيل ${filledCount} صلاة قضاء بنجاح!`);
+            }
+            
+            countInput.value = ''; // تفريغ خانة العدد بعد النجاح
+        }
 
         // دالة مساعدة عامة لتحميل الكائنات كملفات JSON
         function downloadJSON(data, filename) {
@@ -363,26 +454,6 @@
             URL.revokeObjectURL(url);
         }
 
-        // 1. تصدير أوقات الشهر المعروض حالياً على الشاشة فقط
-        function exportMonthTimings() {
-            const monthPrefix = `${currentViewYear}-${String(currentViewMonth).padStart(2, '0')}`;
-            const monthData = {};
-            
-            for (const date in customTimings) {
-                if (date.startsWith(monthPrefix)) {
-                    monthData[date] = customTimings[date];
-                }
-            }
-
-            if (Object.keys(monthData).length === 0) {
-                alert(`لا توجد أوقات مسجلة في التطبيق لشهر ${monthNamesEn[currentViewMonth - 1]} ${currentViewYear} لتصديرها.`);
-                return;
-            }
-
-            downloadJSON(monthData, `Timings_Baalbek_${monthPrefix}.json`);
-        }
-
-        // 2. تصدير السجل الشخصي بالكامل لصلوات المستخدم كنسخة احتياطية آمنة
         function exportUserData() {
             if (Object.keys(appData).length === 0) {
                 alert("سجل صلواتك فارغ حالياً، لا توجد بيانات لتصديرها.");
@@ -392,7 +463,6 @@
             downloadJSON(appData, `MyPrayers_Backup_${today}.json`);
         }
 
-        // 3. استيراد واستعادة السجل الشخصي للصلوات من ملف محفوظ سابقاً
         function importUserData(event) {
             const file = event.target.files[0];
             if (!file) return;
