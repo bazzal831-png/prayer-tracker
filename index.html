@@ -203,21 +203,31 @@
 
                 const div = document.createElement('div'); div.className = 'prayer-item';
                 
-                let tKey = p.id; 
-                if (p.id === 'ghufaila') tKey = 'maghrib';
-                if (p.id === 'night') tKey = 'isha';
+                // مفتاح العرض: أي وقت سيظهر كنص بجانب اسم الصلاة (للإبقاء على عرض وقت الفضيلة أو الأساسي)
+                let displayKey = p.id;
+                if (p.id === 'ghufaila') displayKey = 'maghrib';
+                if (p.id === 'night') displayKey = 'isha';
+
+                // مفتاح المنطق: متى تفتح الصلاة وتصبح متاحة للأداء
+                let logicKey = p.id;
+                if (p.id === 'asr') logicKey = 'dhuhr'; // يفتح العصر مع الظهر
+                if (p.id === 'isha' || p.id === 'ghufaila' || p.id === 'night') logicKey = 'maghrib'; // تفتح العشاء والغفيلة والليل مع المغرب
 
                 let timeDisplay = '';
                 let startMin = -1; let endMin = -1;
 
-                if (dayTimings && dayTimings[tKey]) {
-                    timeDisplay = `<div class="prayer-time">⌚ ${dayTimings[tKey]}</div>`;
-                    startMin = timeToMinutes(dayTimings[tKey]);
+                if (dayTimings) {
+                    if (dayTimings[displayKey]) {
+                        timeDisplay = `<div class="prayer-time">⌚ ${dayTimings[displayKey]}</div>`;
+                    }
+                    if (dayTimings[logicKey]) {
+                        startMin = timeToMinutes(dayTimings[logicKey]);
+                    }
                     
                     if (p.id === 'fajr') {
-                        endMin = dayTimings['sunrise'] ? timeToMinutes(dayTimings['sunrise']) : timeToMinutes(dayTimings['dhuhr']);
+                        endMin = dayTimings['sunrise'] ? timeToMinutes(dayTimings['sunrise']) : (dayTimings['dhuhr'] ? timeToMinutes(dayTimings['dhuhr']) : 1440);
                     } else if (p.id === 'dhuhr' || p.id === 'asr') {
-                        endMin = timeToMinutes(dayTimings['maghrib']);
+                        endMin = dayTimings['maghrib'] ? timeToMinutes(dayTimings['maghrib']) : 1440;
                     } else {
                         endMin = 1440; 
                     }
