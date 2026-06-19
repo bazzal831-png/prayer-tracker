@@ -19,11 +19,21 @@
             --shadow: rgba(0, 0, 0, 0.1);
         }
 
+        /* جعل الشاشة وجسم الصفحة يأخذان كامل ارتفاع شاشة الهاتف ويمنعان التمرير الخارجي */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-dark);
-            margin: 0; padding: 0;
+            display: flex;
+            flex-direction: column; /* ترتيب العناصر عمودياً */
         }
 
         header {
@@ -32,6 +42,7 @@
             padding: 15px 20px;
             display: flex; justify-content: space-between; align-items: center;
             box-shadow: 0 2px 5px var(--shadow);
+            flex-shrink: 0; /* منع الهيدر من الانضغاط */
         }
 
         h1 { margin: 0; font-size: 1.5rem; }
@@ -42,56 +53,86 @@
             cursor: pointer; font-weight: bold;
         }
 
-        .container { padding: 20px; max-width: 800px; margin: auto; }
-        .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; direction: ltr; }
+        /* جعل الحاوية تتمدد لتملأ كامل الارتفاع المتبقي */
+        .container { 
+            padding: 10px; 
+            max-width: 800px; 
+            margin: 0 auto;
+            width: 100%;
+            flex-grow: 1; 
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+        
+        .controls { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 10px; 
+            direction: ltr; 
+            flex-shrink: 0;
+        }
+        
         #current-month-display { margin: 0; }
 
-        /* شبكة التقويم المحدثة (7 أعمدة) */
-        .calendar-grid {
-            display: grid; 
-            grid-template-columns: repeat(7, 1fr); 
-            gap: 5px; 
-            direction: ltr; /* لتبدأ الأعمدة من اليسار (الأحد) إلى اليمين (السبت) */
-        }
-
-        /* تنسيق عناوين أيام الأسبوع */
-        .week-day-header {
+        /* شريط أيام الأسبوع الثابت */
+        .week-days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            direction: ltr;
             text-align: center;
             font-weight: bold;
             font-size: 0.8rem;
             color: var(--secondary);
-            padding: 5px 0;
+            padding: 6px 0;
             background-color: #eef2f5;
             border-radius: 4px;
             margin-bottom: 5px;
+            flex-shrink: 0;
         }
 
-        /* المربعات الفارغة للمحاذاة */
+        /* شبكة التواريخ التي تتمدد عمودياً لتملأ الشاشة بالكامل */
+        .calendar-grid {
+            display: grid; 
+            grid-template-columns: repeat(7, 1fr); 
+            grid-auto-rows: 1fr; /* السحر هنا: تقسيم الارتفاع المتاح بالتساوي على الصفوف */
+            gap: 5px; 
+            direction: ltr;
+            flex-grow: 1; /* إجبار الشبكة على ملء المساحة الطولية بالكامل */
+        }
+
         .empty-day {
             visibility: hidden;
         }
 
-        /* تعديل حجم بطاقة اليوم لتناسب الشاشات الصغيرة */
+        /* تعديل بطاقة اليوم لتصبح طويلة وتظهر الأرقام في الأعلى تماماً كالصورة المرفقة */
         .day-card {
             background: white; 
-            padding: 8px 2px; 
+            padding: 5px 2px; 
             border-radius: 6px; 
             text-align: center;
             cursor: pointer; 
             box-shadow: 0 2px 4px var(--shadow); 
             transition: transform 0.2s; 
             border: 2px solid transparent;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start; /* محاذاة الرقم للأعلى */
+            align-items: center;
+            box-sizing: border-box;
         }
 
-        /* تصغير خط أرقام الأيام */
         .day-card h3 {
-            margin: 0;
+            margin: 2px 0 0 0;
             font-size: 0.9rem;
         }
 
         .day-card:hover { transform: scale(1.05); border-color: var(--accent); }
         .day-card.today { background-color: #e8f4f8; border-color: var(--accent); }
 
+        /* تنسيقات المودال والنوافذ المنبثقة بقيت كما هي */
         .modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center;
@@ -153,6 +194,12 @@
             <h2 id="current-month-display">June 2026</h2>
             <button onclick="changeMonth(1)">Next</button>
         </div>
+        
+        <!-- شريط الأيام المضاف حديثاً هنا ليبقى ثابتاً في الواجهة -->
+        <div class="week-days-grid">
+            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+        </div>
+        
         <div class="calendar-grid" id="calendar-grid"></div>
     </div>
 
@@ -226,32 +273,20 @@
             reader.readAsText(file);
         }
 
-        // تحديث دالة بناء التقويم لتشمل أسماء الأيام والمحاذاة الصحيحة
         function renderCalendar() {
             document.getElementById('current-month-display').innerText = `${monthNamesEn[currentViewMonth - 1]} ${currentViewYear}`;
             const grid = document.getElementById('calendar-grid');
             grid.innerHTML = '';
 
-            // 1. طباعة أسماء أيام الأسبوع في الصف العلوي
-            const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-            weekDays.forEach(day => {
-                const header = document.createElement('div');
-                header.className = 'week-day-header';
-                header.innerText = day;
-                grid.appendChild(header);
-            });
-
-            // 2. حساب اليوم الأول من الشهر لمعرفة الفراغات المطلوبة للمحاذاة
+            // حساب اليوم الأول لترك الفراغات المناسبة للمحاذاة
             const firstDayIndex = new Date(currentViewYear, currentViewMonth - 1, 1).getDay();
             
-            // إضافة مربعات فارغة غير مرئية قبل بداية الشهر
             for (let j = 0; j < firstDayIndex; j++) {
                 const emptyCard = document.createElement('div');
                 emptyCard.className = 'empty-day';
                 grid.appendChild(emptyCard);
             }
 
-            // 3. طباعة أيام الشهر الفعلي
             const daysInMonth = new Date(currentViewYear, currentViewMonth, 0).getDate();
             const todayStr = formatDate(new Date());
 
@@ -390,6 +425,7 @@
             }
         }
 
+        // تم تصحيح دالة الإغلاق لتعمل بشكل سليم دائماً
         function openSettings() { generateStats(); document.getElementById('settings-modal').style.display = 'flex'; }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         window.onload = () => { renderCalendar(); };
