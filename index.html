@@ -11,173 +11,62 @@
             --bg-color: #f4f7f6;
             --primary: #2c3e50;
             --secondary: #34495e;
-            --accent: #2980b9;
-            --success: #27ae60;
-            --danger: #c0392b;
+            --accent: #2980b9;    /* أزرق */
+            --success: #27ae60;   /* أخضر */
+            --danger: #c0392b;    /* أحمر */
+            --warning: #e67e22;   /* برتقالي */
+            --disabled: #95a5a6;  /* رمادي */
             --text-light: #ecf0f1;
             --text-dark: #2c3e50;
             --shadow: rgba(0, 0, 0, 0.1);
         }
 
-        /* جعل الشاشة وجسم الصفحة يأخذان كامل ارتفاع شاشة الهاتف ويمنعان التمرير الخارجي */
-        html, body {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            overflow: hidden;
-        }
+        html, body { height: 100%; margin: 0; padding: 0; box-sizing: border-box; overflow: hidden; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-dark); display: flex; flex-direction: column; }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-dark);
-            display: flex;
-            flex-direction: column; /* ترتيب العناصر عمودياً */
-        }
-
-        header {
-            background-color: var(--primary);
-            color: var(--text-light);
-            padding: 15px 20px;
-            display: flex; justify-content: space-between; align-items: center;
-            box-shadow: 0 2px 5px var(--shadow);
-            flex-shrink: 0; /* منع الهيدر من الانضغاط */
-        }
-
+        header { background-color: var(--primary); color: var(--text-light); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px var(--shadow); flex-shrink: 0; }
         h1 { margin: 0; font-size: 1.5rem; }
 
-        .settings-btn {
-            background-color: var(--accent); color: white;
-            border: none; padding: 10px 15px; border-radius: 5px;
-            cursor: pointer; font-weight: bold;
-        }
+        .settings-btn { background-color: var(--accent); color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
 
-        /* جعل الحاوية تتمدد لتملأ كامل الارتفاع المتبقي */
-        .container { 
-            padding: 10px; 
-            max-width: 800px; 
-            margin: 0 auto;
-            width: 100%;
-            flex-grow: 1; 
-            display: flex;
-            flex-direction: column;
-            box-sizing: border-box;
-        }
-        
-        .controls { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            margin-bottom: 10px; 
-            direction: ltr; 
-            flex-shrink: 0;
-        }
-        
+        .container { padding: 10px; max-width: 800px; margin: 0 auto; width: 100%; flex-grow: 1; display: flex; flex-direction: column; box-sizing: border-box; }
+        .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; direction: ltr; flex-shrink: 0; }
         #current-month-display { margin: 0; }
 
-        /* شريط أيام الأسبوع الثابت */
-        .week-days-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 5px;
-            direction: ltr;
-            text-align: center;
-            font-weight: bold;
-            font-size: 0.8rem;
-            color: var(--secondary);
-            padding: 6px 0;
-            background-color: #eef2f5;
-            border-radius: 4px;
-            margin-bottom: 5px;
-            flex-shrink: 0;
-        }
+        .week-days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; direction: ltr; text-align: center; font-weight: bold; font-size: 0.8rem; color: var(--secondary); padding: 6px 0; background-color: #eef2f5; border-radius: 4px; margin-bottom: 5px; flex-shrink: 0; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 5px; direction: ltr; flex-grow: 1; }
+        .empty-day { visibility: hidden; }
 
-        /* شبكة التواريخ التي تتمدد عمودياً لتملأ الشاشة بالكامل */
-        .calendar-grid {
-            display: grid; 
-            grid-template-columns: repeat(7, 1fr); 
-            grid-auto-rows: 1fr; /* السحر هنا: تقسيم الارتفاع المتاح بالتساوي على الصفوف */
-            gap: 5px; 
-            direction: ltr;
-            flex-grow: 1; /* إجبار الشبكة على ملء المساحة الطولية بالكامل */
-        }
-
-        .empty-day {
-            visibility: hidden;
-        }
-
-        /* تعديل بطاقة اليوم لتصبح طويلة وتظهر الأرقام في الأعلى تماماً كالصورة المرفقة */
-        .day-card {
-            background: white; 
-            padding: 5px 2px; 
-            border-radius: 6px; 
-            text-align: center;
-            cursor: pointer; 
-            box-shadow: 0 2px 4px var(--shadow); 
-            transition: transform 0.2s; 
-            border: 2px solid transparent;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start; /* محاذاة الرقم للأعلى */
-            align-items: center;
-            box-sizing: border-box;
-        }
-
-        .day-card h3 {
-            margin: 2px 0 0 0;
-            font-size: 0.9rem;
-        }
-
+        .day-card { background: white; padding: 5px 2px; border-radius: 6px; text-align: center; cursor: pointer; box-shadow: 0 2px 4px var(--shadow); transition: transform 0.2s; border: 2px solid transparent; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; box-sizing: border-box; }
+        .day-card h3 { margin: 2px 0 0 0; font-size: 0.9rem; }
         .day-card:hover { transform: scale(1.05); border-color: var(--accent); }
         .day-card.today { background-color: #e8f4f8; border-color: var(--accent); }
 
-        /* تنسيقات المودال والنوافذ المنبثقة بقيت كما هي */
-        .modal {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center;
-        }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto; }
+        .close-btn { background: var(--danger); color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; float: left; }
 
-        .modal-content {
-            background: white; padding: 20px; border-radius: 10px;
-            width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;
-        }
-
-        .close-btn {
-            background: var(--danger); color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; float: left;
-        }
-
-        .prayer-item {
-            background: #f9f9f9; margin: 10px 0; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-right: 4px solid var(--accent);
-        }
-
+        .prayer-item { background: #f9f9f9; margin: 10px 0; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-right: 4px solid var(--accent); }
         .prayer-info h3 { margin: 0 0 5px 0; font-size: 1.1rem; }
         .prayer-time { font-size: 0.9rem; color: #7f8c8d; font-weight: bold; }
 
-        .action-btn {
-            padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; background-color: var(--accent); color: white;
-        }
-        .action-btn.completed { background-color: var(--success); cursor: not-allowed; }
-        .action-btn.qadaa { background-color: var(--danger); }
+        /* الألوان الجديدة للأزرار */
+        .action-btn { padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; color: white; transition: 0.3s; }
+        .action-btn.adaa { background-color: var(--accent); } /* أزرق: متاح للأداء الآن */
+        .action-btn.completed-adaa { background-color: var(--success); } /* أخضر: تمت الصلاة أداءً */
+        .action-btn.qadaa { background-color: var(--danger); } /* أحمر: يجب قضاؤها */
+        .action-btn.completed-qadaa { background-color: var(--warning); color: #fff; } /* برتقالي: تم القضاء */
+        .action-btn.future { background-color: var(--disabled); cursor: not-allowed; } /* رمادي: للمستقبل */
+        .action-btn.legacy-completed { background-color: var(--success); }
 
         .stats-grid { display: flex; flex-wrap: wrap; gap: 30px; justify-content: center; margin-top: 20px;}
         .shadow-box-container { position: relative; width: 120px; height: 120px; }
-        .shadow-box-bg {
-            position: absolute; top: 15px; left: -15px; width: 100%; height: 100%;
-            background-color: #d5f5e3; border: 2px dashed var(--success); border-radius: 10px;
-            z-index: 1; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px; color: var(--success); font-weight: bold; font-size: 0.9rem;
-        }
-        .shadow-box-fg {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: white; border: 2px solid var(--danger); border-radius: 10px;
-            z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 4px 8px var(--shadow);
-        }
+        .shadow-box-bg { position: absolute; top: 15px; left: -15px; width: 100%; height: 100%; background-color: #d5f5e3; border: 2px dashed var(--success); border-radius: 10px; z-index: 1; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px; color: var(--success); font-weight: bold; font-size: 0.9rem; }
+        .shadow-box-fg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: white; border: 2px solid var(--danger); border-radius: 10px; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 4px 8px var(--shadow); }
         .shadow-box-fg span.title { font-size: 1rem; color: var(--primary); font-weight: bold; }
         .shadow-box-fg span.num { font-size: 1.8rem; color: var(--danger); font-weight: bold; margin-top: 5px; }
 
-        .file-upload-btn {
-            background-color: var(--secondary); color: white; padding: 10px; border-radius: 5px; cursor: pointer; display: block; text-align: center; margin-bottom: 15px;
-        }
+        .file-upload-btn { background-color: var(--secondary); color: white; padding: 10px; border-radius: 5px; cursor: pointer; display: block; text-align: center; margin-bottom: 15px; }
         input[type="file"] { display: none; }
     </style>
 </head>
@@ -195,7 +84,6 @@
             <button onclick="changeMonth(1)">Next</button>
         </div>
         
-        <!-- شريط الأيام المضاف حديثاً هنا ليبقى ثابتاً في الواجهة -->
         <div class="week-days-grid">
             <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
         </div>
@@ -215,14 +103,11 @@
         <div class="modal-content">
             <button class="close-btn" onclick="closeModal('settings-modal')">إغلاق</button>
             <h2>الإعدادات والإحصائيات</h2>
-            
             <label class="file-upload-btn">
                 📥 استيراد مواقيت بعلبك (ملف JSON)
                 <input type="file" accept=".json" onchange="importJSON(event)">
             </label>
-
             <button class="settings-btn" style="background: var(--danger); width: 100%; margin-bottom: 20px;" onclick="resetData()">تصفير البيانات (Reset)</button>
-
             <hr>
             <h3>إحصائيات القضاء</h3>
             <p style="font-size: 0.85rem; color: #7f8c8d;">المربع الأمامي: قضاء مطلوب | الخلفي: مقضية</p>
@@ -232,15 +117,12 @@
 
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('Service Worker Registered!', reg))
-            .catch(err => console.error('Service Worker registration failed', err));
+            navigator.serviceWorker.register('./sw.js').catch(err => console.error('SW Error', err));
         }
 
         const START_DATE_STR = '2026-06-19'; 
         let currentViewMonth = new Date().getMonth() + 1;
         let currentViewYear = new Date().getFullYear();
-        
         const monthNamesEn = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
         let appData = JSON.parse(localStorage.getItem('prayerData_v1')) || {};
@@ -256,6 +138,12 @@
             { id: 'night', name: 'صلاة الليل', type: 'nafl' }
         ];
 
+        function timeToMinutes(timeStr) {
+            if (!timeStr) return 0;
+            let parts = timeStr.split(':');
+            return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        }
+
         function importJSON(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -264,11 +152,8 @@
                 try {
                     const json = JSON.parse(e.target.result);
                     localStorage.setItem('baalbekTimings', JSON.stringify(json));
-                    customTimings = json;
-                    alert("تم استيراد مواقيت بعلبك بنجاح!");
-                } catch (err) {
-                    alert("حدث خطأ! تأكد من أن ملف الـ JSON مكتوب بطريقة صحيحة.");
-                }
+                    customTimings = json; alert("تم الاستيراد بنجاح!");
+                } catch (err) { alert("حدث خطأ في ملف JSON."); }
             };
             reader.readAsText(file);
         }
@@ -277,25 +162,17 @@
             document.getElementById('current-month-display').innerText = `${monthNamesEn[currentViewMonth - 1]} ${currentViewYear}`;
             const grid = document.getElementById('calendar-grid');
             grid.innerHTML = '';
-
-            // حساب اليوم الأول لترك الفراغات المناسبة للمحاذاة
             const firstDayIndex = new Date(currentViewYear, currentViewMonth - 1, 1).getDay();
-            
             for (let j = 0; j < firstDayIndex; j++) {
-                const emptyCard = document.createElement('div');
-                emptyCard.className = 'empty-day';
-                grid.appendChild(emptyCard);
+                const emptyCard = document.createElement('div'); emptyCard.className = 'empty-day'; grid.appendChild(emptyCard);
             }
-
             const daysInMonth = new Date(currentViewYear, currentViewMonth, 0).getDate();
             const todayStr = formatDate(new Date());
 
             for (let i = 1; i <= daysInMonth; i++) {
                 const dayStr = `${currentViewYear}-${String(currentViewMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-                const card = document.createElement('div');
-                card.className = 'day-card';
+                const card = document.createElement('div'); card.className = 'day-card';
                 if (dayStr === todayStr) card.classList.add('today');
-                
                 card.innerHTML = `<h3>${i}</h3>`;
                 card.onclick = () => openDay(dayStr);
                 grid.appendChild(card);
@@ -307,71 +184,92 @@
             document.getElementById('modal-date-title').innerText = `صلوات يوم: ${dateStr}`;
             list.innerHTML = '';
 
-            const todayStr = formatDate(new Date());
+            const todayObj = new Date();
+            const todayStr = formatDate(todayObj);
+            const nowMin = todayObj.getHours() * 60 + todayObj.getMinutes();
             const dayTimings = customTimings[dateStr] || null;
 
-            const isFuture = dateStr > todayStr;
+            const isFutureDay = dateStr > todayStr;
             const isToday = dateStr === todayStr;
-            const isNearPast = dateStr < todayStr && dateStr >= START_DATE_STR;
             const isFarPast = dateStr < START_DATE_STR;
 
             if (!appData[dateStr]) appData[dateStr] = {};
 
             prayerNames.forEach(p => {
-                const isCompleted = appData[dateStr][p.id] === true;
+                const savedState = appData[dateStr][p.id]; 
                 
                 if (isFarPast && p.type === 'nafl') return;
-                if (isNearPast && p.type === 'nafl' && !isCompleted) return;
+                if (dateStr < todayStr && p.type === 'nafl' && !savedState) return;
 
-                const div = document.createElement('div');
-                div.className = 'prayer-item';
+                const div = document.createElement('div'); div.className = 'prayer-item';
                 
+                let tKey = p.id; 
+                if (p.id === 'ghufaila') tKey = 'maghrib';
+                if (p.id === 'night') tKey = 'isha';
+
                 let timeDisplay = '';
-                if ((isToday || isFuture) && dayTimings) {
-                    let tKey = p.id.split('_')[0]; 
-                    if (p.id === 'ghufaila') tKey = 'maghrib';
-                    if (p.id === 'night') tKey = 'isha';
-                    if (dayTimings[tKey]) {
-                        timeDisplay = `<div class="prayer-time">⌚ ${dayTimings[tKey]}</div>`;
+                let startMin = -1; let endMin = -1;
+
+                if (dayTimings && dayTimings[tKey]) {
+                    timeDisplay = `<div class="prayer-time">⌚ ${dayTimings[tKey]}</div>`;
+                    startMin = timeToMinutes(dayTimings[tKey]);
+                    
+                    if (p.id === 'fajr') {
+                        endMin = dayTimings['sunrise'] ? timeToMinutes(dayTimings['sunrise']) : timeToMinutes(dayTimings['dhuhr']);
+                    } else if (p.id === 'dhuhr' || p.id === 'asr') {
+                        endMin = timeToMinutes(dayTimings['maghrib']);
+                    } else {
+                        endMin = 1440; 
                     }
                 }
 
-                let actionHTML = '';
-                if (!isFuture) {
-                    let btnClass = 'action-btn';
-                    let btnText = 'إتمام الصلاة';
-                    let isQadaa = false;
+                let btnClass = 'action-btn'; let btnText = ''; let clickAction = ''; let disabled = false;
 
-                    if (isCompleted) {
-                        btnClass += ' completed';
-                        btnText = 'مقضية / تامة ✔';
-                    } else if (dateStr < todayStr && p.type === 'fard') {
-                        btnClass += ' qadaa';
-                        btnText = 'قضاء الصلاة';
-                        isQadaa = true;
+                if (savedState) {
+                    if (savedState === 'adaa') { btnClass += ' completed-adaa'; btnText = 'تمت أداءً ✔'; }
+                    else if (savedState === 'qadaa') { btnClass += ' completed-qadaa'; btnText = 'تم القضاء ✔'; }
+                    else { btnClass += ' legacy-completed'; btnText = 'تمت ✔'; } 
+                    clickAction = `removePrayer('${dateStr}', '${p.id}')`;
+                } else {
+                    if (isFutureDay) {
+                        disabled = true; btnClass += ' future'; btnText = 'لم يحن وقتها';
+                    } else if (isToday) {
+                        if (startMin !== -1 && nowMin < startMin) {
+                            disabled = true; btnClass += ' future'; btnText = 'لم يحن وقتها';
+                        } else if (startMin !== -1 && nowMin <= endMin) {
+                            btnClass += ' adaa'; btnText = 'تسجيل أداء'; // زر أزرق
+                            clickAction = `togglePrayer('${dateStr}', '${p.id}', 'adaa')`;
+                        } else {
+                            btnClass += ' qadaa'; btnText = 'يجب قضاؤها'; // زر أحمر
+                            clickAction = `togglePrayer('${dateStr}', '${p.id}', 'qadaa')`;
+                        }
+                    } else {
+                        btnClass += ' qadaa'; btnText = 'يجب قضاؤها'; // زر أحمر للأيام السابقة
+                        clickAction = `togglePrayer('${dateStr}', '${p.id}', 'qadaa')`;
                     }
-
-                    actionHTML = `<button class="${btnClass}" onclick="togglePrayer('${dateStr}', '${p.id}', ${isQadaa})" ${isCompleted ? 'disabled' : ''}>${btnText}</button>`;
                 }
 
                 div.innerHTML = `
-                    <div class="prayer-info">
-                        <h3>${p.name}</h3>
-                        ${timeDisplay}
-                    </div>
-                    ${actionHTML}
+                    <div class="prayer-info"><h3>${p.name}</h3>${timeDisplay}</div>
+                    <button class="${btnClass}" ${disabled ? 'disabled' : `onclick="${clickAction}"`}>${btnText}</button>
                 `;
                 list.appendChild(div);
             });
             document.getElementById('day-modal').style.display = 'flex';
         }
 
-        function togglePrayer(dateStr, prayerId, isQadaa) {
-            let msg = isQadaa ? "هذه الصلاة قضاء. هل تريد تأكيد قضائها الآن؟" : "هل أتممت هذه الصلاة فعلاً؟";
+        function togglePrayer(dateStr, prayerId, type) {
+            let msg = type === 'adaa' ? "هل أتممت هذه الصلاة في وقتها (أداء)؟" : "هل أتممت قضاء هذه الصلاة للتو؟";
             if (confirm(msg)) {
-                appData[dateStr][prayerId] = true;
-                saveData();
-                openDay(dateStr);
+                appData[dateStr][prayerId] = type;
+                saveData(); openDay(dateStr); generateStats();
+            }
+        }
+
+        function removePrayer(dateStr, prayerId) {
+            if (confirm("هل تريد التراجع وإلغاء تسجيل هذه الصلاة لتعود كأنها لم تُصلَّ؟")) {
+                delete appData[dateStr][prayerId];
+                saveData(); openDay(dateStr); generateStats();
             }
         }
 
@@ -384,21 +282,17 @@
             fardPrayers.forEach(p => {
                 let required = 0; let completed = 0;
                 const daysInMonth = new Date(currentViewYear, currentViewMonth, 0).getDate();
-                
                 for(let i=1; i<=daysInMonth; i++) {
                     const dStr = `${currentViewYear}-${String(currentViewMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
                     if(dStr < todayStr) {
-                        if(appData[dStr] && appData[dStr][p.id] === true) completed++;
+                        if(appData[dStr] && appData[dStr][p.id]) completed++;
                         else required++;
                     }
                 }
                 container.innerHTML += `
                     <div class="shadow-box-container">
                         <div class="shadow-box-bg">أُنجز: ${completed}</div>
-                        <div class="shadow-box-fg">
-                            <span class="title">${p.name}</span>
-                            <span class="num">${required}</span>
-                        </div>
+                        <div class="shadow-box-fg"><span class="title">${p.name}</span><span class="num">${required}</span></div>
                     </div>`;
             });
         }
@@ -411,21 +305,17 @@
         }
 
         function formatDate(date) {
-            const y = date.getFullYear();
-            const m = String(date.getMonth() + 1).padStart(2, '0');
-            const d = String(date.getDate()).padStart(2, '0');
+            const y = date.getFullYear(); const m = String(date.getMonth() + 1).padStart(2, '0'); const d = String(date.getDate()).padStart(2, '0');
             return `${y}-${m}-${d}`;
         }
 
         function saveData() { localStorage.setItem('prayerData_v1', JSON.stringify(appData)); }
         function resetData() {
             if(confirm("تحذير: هل تريد حقاً مسح كل سجلاتك السابقة؟")) {
-                localStorage.removeItem('prayerData_v1');
-                appData = {}; renderCalendar(); closeModal('settings-modal');
+                localStorage.removeItem('prayerData_v1'); appData = {}; renderCalendar(); closeModal('settings-modal');
             }
         }
 
-        // تم تصحيح دالة الإغلاق لتعمل بشكل سليم دائماً
         function openSettings() { generateStats(); document.getElementById('settings-modal').style.display = 'flex'; }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         window.onload = () => { renderCalendar(); };
