@@ -6,6 +6,7 @@
     <meta name="theme-color" content="#2c3e50">
     <link rel="manifest" href="./manifest.json">
     <title>مراقب الصلوات - بعلبك</title>
+    <!-- استدعاء مكتبة Chart.js للرسوم البيانية -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -189,7 +190,7 @@
             return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
         }
 
-        // تم التعديل: دمج المواقيت بدلاً من مسح القديم
+        // تم إصلاح مشكلة رفع نفس الملف
         function importJSON(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -197,13 +198,13 @@
             reader.onload = function(e) {
                 try {
                     const json = JSON.parse(e.target.result);
-                    // الدمج الذكي للمواقيت
                     customTimings = { ...customTimings, ...json };
                     localStorage.setItem('baalbekTimings', JSON.stringify(customTimings));
                     alert("تم استيراد ودمج المواقيت الجديدة بنجاح! لن تتأثر الأشهر القديمة.");
                 } catch (err) { alert("حدث خطأ في ملف JSON الخاص بالمواقيت."); }
             };
             reader.readAsText(file);
+            event.target.value = ''; // تفريغ حقل الرفع
         }
 
         function renderCalendar() {
@@ -329,7 +330,7 @@
             }
         }
 
-        // تم التعديل: إنشاء الرسم البياني للإحصائيات الشهرية
+        // تم الإصلاح: تجاهل الأيام التي تسبق تاريخ بدء التطبيق
         function generateStats() {
             document.getElementById('stats-month-name').innerText = monthNamesEn[currentViewMonth - 1];
             
@@ -349,11 +350,12 @@
                 for(let i = 1; i <= daysInMonth; i++) {
                     const dStr = `${currentViewYear}-${String(currentViewMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
                     
-                    if(dStr < todayStr) {
+                    // الشرط المعدل: يجب أن يكون التاريخ من تاريخ بدء التطبيق فصاعداً وحتى اليوم الحالي
+                    if(dStr >= START_DATE_STR && dStr <= todayStr) {
                         let state = appData[dStr] ? appData[dStr][pId] : null;
                         if(state === 'adaa') adaaCount++;
                         else if(state === 'qadaa') qadaaCount++;
-                        else if(state) adaaCount++; // دعم للإصدارات القديمة من البيانات
+                        else if(state) adaaCount++; 
                         else missedCount++;
                     }
                 }
@@ -365,7 +367,7 @@
             const ctx = document.getElementById('monthlyChart').getContext('2d');
             
             if(statsChart) {
-                statsChart.destroy(); // تدمير الرسم القديم لمنع التداخل
+                statsChart.destroy(); 
             }
 
             statsChart = new Chart(ctx, {
@@ -414,13 +416,14 @@
 
         function openSettings() { 
             document.getElementById('settings-modal').style.display = 'flex'; 
-            generateStats(); // استدعاء الرسم البياني عند فتح الإعدادات
+            generateStats(); 
             document.getElementById('bulk-year').value = currentViewYear;
             document.getElementById('bulk-month').value = currentViewMonth;
         }
 
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         
+        // تم الإصلاح: منع تعبئة قضاء لليوم الحالي (يجب أن يكون القضاء للأمس وما قبله)
         function applyBulkQadaa() {
             const startYear = parseInt(document.getElementById('bulk-year').value);
             const startMonth = parseInt(document.getElementById('bulk-month').value);
@@ -448,7 +451,8 @@
                     if (remainingCount === 0) break; 
                     const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
                     
-                    if (dateStr > todayStr) continue;
+                    // الشرط المعدل: تجاهل اليوم الحالي والأيام المستقبلية
+                    if (dateStr >= todayStr) continue;
 
                     if (!appData[dateStr]) appData[dateStr] = {};
                     
@@ -469,7 +473,7 @@
 
             saveData();
             renderCalendar();
-            generateStats(); // تحديث الرسم البياني بعد التعديل
+            generateStats(); 
             
             let alertMessage = `✅ تم تسجيل ${filledCount} صلاة قضاء بنجاح!\n\n📋 التوزيع:\n`;
             for (const key in distributionReport) {
@@ -501,7 +505,7 @@
             downloadJSON(appData, `MyPrayers_Backup_${today}.json`);
         }
 
-        // تم التعديل: دمج سجلات البيانات بدلاً من الاستبدال
+        // تم إصلاح مشكلة رفع نفس الملف
         function importUserData(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -510,17 +514,15 @@
                 try {
                     const json = JSON.parse(e.target.result);
                     if (typeof json === 'object' && json !== null) {
-                        // عملية الدمج الذكي للبيانات المستوردة مع البيانات الحالية
                         for (let dateKey in json) {
                             if (!appData[dateKey]) appData[dateKey] = {};
                             for (let prayerKey in json[dateKey]) {
-                                // إضافة الصلاة من الملف الاحتياطي إلى التطبيق
                                 appData[dateKey][prayerKey] = json[dateKey][prayerKey];
                             }
                         }
                         saveData();
                         renderCalendar();
-                        generateStats(); // تحديث الرسم البياني
+                        generateStats(); 
                         alert("تم دمج سجل صلواتك الشخصي بنجاح وتحديث التقويم!");
                     } else {
                         alert("صيغة الملف غير صحيحة.");
@@ -528,6 +530,7 @@
                 } catch (err) { alert("حدث خطأ أثناء قراءة ملف السجلات الشخصية."); }
             };
             reader.readAsText(file);
+            event.target.value = ''; // تفريغ حقل الرفع
         }
 
         window.onload = () => { renderCalendar(); };
