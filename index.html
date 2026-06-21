@@ -210,6 +210,17 @@
             { id: 'night', name: 'صلاة الليل', type: 'nafl' }
         ];
 
+        // مصفوفة التسبيحات والأذكار الثابتة بناءً على أيام الأسبوع
+        window.dailyDhikr = {
+            0: [ { id: 'dhikr_sun_1', name: '📿 يا فتاح (489)' }, { id: 'dhikr_sun_2', name: '📿 يا ذا الجلال والإكرام (100)' } ], // الأحد
+            1: [ { id: 'dhikr_mon_1', name: '📿 يا لطيف (129)' }, { id: 'dhikr_mon_2', name: '📿 يا قاضي الحاجات (100)' } ], // الاثنين
+            2: [ { id: 'dhikr_tue_1', name: '📿 يا قابض (903)' }, { id: 'dhikr_tue_2', name: '📿 يا أرحم الراحمين (100)' } ], // الثلاثاء
+            3: [ { id: 'dhikr_wed_1', name: '📿 يا متعال (541)' }, { id: 'dhikr_wed_2', name: '📿 يا حي يا قيوم (100)' } ], // الأربعاء
+            4: [ { id: 'dhikr_thu_1', name: '📿 يا رزاق (308)' }, { id: 'dhikr_thu_2', name: '📿 لا إله إلا الله الحق المبين (100)' } ], // الخميس
+            5: [ { id: 'dhikr_fri_1', name: '📿 يا نور (256)' }, { id: 'dhikr_fri_2', name: '📿 اللهم صل على محمد وآل محمد وعجل فرجهم (100)' } ], // الجمعة
+            6: [ { id: 'dhikr_sat_1', name: '📿 يا غني (106)' }, { id: 'dhikr_sat_2', name: '📿 يا رب العالمين (100)' } ]  // السبت
+        };
+
         const hijriEvents = {
             "1-10": "عاشوراء", "2-20": "الأربعين", "2-28": "وفاة النبي (ص)", "3-17": "ولادة النبي (ص)",
             "6-3": "شهادة الزهراء (ع)", "7-13": "ولادة الإمام علي (ع)", "7-27": "المبعث النبوي",
@@ -369,16 +380,35 @@
             const isFutureDay = dateStr > todayStr; const isToday = dateStr === todayStr; const isFarPast = dateStr < appStartDate;
             if (!appData[dateStr]) appData[dateStr] = {};
 
-            // دمج الصلوات مع الأدعية بحسب اليوم
+            // دمج الصلوات مع الأدعية والتسبيحات بحسب اليوم
             let dayTasks = [...prayerNames];
             if (dayOfWeek === 2) dayTasks.push({ id: 'tawassul', name: 'دعاء التوسل', type: 'dua' });
             if (dayOfWeek === 4) dayTasks.push({ id: 'kumayl', name: 'دعاء كميل', type: 'dua' });
 
+            // إضافة الأذكار الثابتة لليوم الحالي
+            if (window.dailyDhikr[dayOfWeek]) {
+                window.dailyDhikr[dayOfWeek].forEach(dhikr => {
+                    dayTasks.push({ id: dhikr.id, name: dhikr.name, type: 'dhikr' });
+                });
+            }
+
+            // جلب الأذكار المخصصة المضافة من قبل المستخدم لهذا اليوم
+            if (appData[dateStr]) {
+                Object.keys(appData[dateStr]).forEach(key => {
+                    if (key.startsWith('custom_') && key.endsWith('_text')) {
+                        const baseId = key.replace('_text', '');
+                        dayTasks.push({ id: baseId, name: '📿 ' + appData[dateStr][key], type: 'custom_dhikr' });
+                    }
+                });
+            }
+
             dayTasks.forEach(p => {
-                const savedState = appData[dateStr][p.id]; 
+                const isCustom = p.type === 'custom_dhikr';
+                const savedState = isCustom ? appData[dateStr][`${p.id}_state`] : appData[dateStr][p.id];
+
                 // إخفاء المستحبات للأيام القديمة (قبل تاريخ بدء التطبيق)
                 if (isFarPast && p.type !== 'fard') return;
-                // إخفاء المستحبات إذا مر اليوم ولم يتم تسجيلها (المرونة)
+                // إخفاء المستحبات والتسبيحات إذا مر اليوم ولم يتم تسجيلها (المرونة وعدم التراكم)
                 if (dateStr < todayStr && p.type !== 'fard' && !savedState) return;
 
                 const div = document.createElement('div'); div.className = 'prayer-item';
@@ -386,25 +416,28 @@
                 let logicKey = p.id; if (p.id === 'asr') logicKey = 'dhuhr'; if (p.id === 'isha' || p.id === 'ghufaila' || p.id === 'night') logicKey = 'maghrib'; 
 
                 let timeDisplay = ''; let startMin = -1; let endMin = -1;
-                if (dayTimings && p.type !== 'dua') {
+                if (dayTimings && p.type !== 'dua' && p.type !== 'dhikr' && p.type !== 'custom_dhikr') {
                     if (dayTimings[displayKey]) timeDisplay = `<div class="prayer-time">⌚ ${dayTimings[displayKey]}</div>`;
                     if (dayTimings[logicKey]) startMin = timeToMinutes(dayTimings[logicKey]);
                     endMin = getPrayerEndMin(p.id, dayTimings);
                 }
 
                 let btnClass = 'action-btn'; let btnText = ''; let clickAction = ''; let disabled = false;
+                let deleteHtml = '';
+
                 if (savedState) {
                     if (p.type !== 'fard') { btnClass += ' completed-adaa'; btnText = 'تم ✔'; }
                     else if (savedState === 'adaa') { btnClass += ' completed-adaa'; btnText = 'تمت أداءً ✔'; }
                     else if (savedState === 'qadaa') { btnClass += ' completed-qadaa'; btnText = 'تم القضاء ✔'; }
                     else { btnClass += ' legacy-completed'; btnText = 'تمت ✔'; } 
-                    clickAction = `window.removePrayer('${dateStr}', '${p.id}')`;
+                    clickAction = isCustom ? `window.removeCustomPrayer('${dateStr}', '${p.id}')` : `window.removePrayer('${dateStr}', '${p.id}')`;
                 } else {
                     if (isFutureDay) { disabled = true; btnClass += ' future'; btnText = 'لم يحن'; } 
                     else if (p.type !== 'fard') { 
-                        // أزرار المستحبات تظهر فقط "أداء" ولا يوجد لها "قضاء"
-                        btnClass += ' adaa'; btnText = (p.type === 'dua' ? 'تمت القراءة' : 'تمت الصلاة'); 
-                        clickAction = `window.togglePrayer('${dateStr}', '${p.id}', 'adaa')`; 
+                        // أزرار المستحبات والتسبيحات
+                        btnClass += ' adaa'; 
+                        btnText = (p.type === 'dua' ? 'تمت القراءة' : (p.type === 'dhikr' || isCustom ? 'تم التسبيح' : 'تمت الصلاة')); 
+                        clickAction = isCustom ? `window.toggleCustomPrayer('${dateStr}', '${p.id}', 'adaa')` : `window.togglePrayer('${dateStr}', '${p.id}', 'adaa')`; 
                     }
                     else if (isToday) {
                         if (startMin !== -1 && nowMin < startMin) { disabled = true; btnClass += ' future'; btnText = 'لم يحن'; } 
@@ -413,14 +446,74 @@
                     } else { btnClass += ' qadaa'; btnText = 'قضاء'; clickAction = `window.togglePrayer('${dateStr}', '${p.id}', 'qadaa')`; }
                 }
 
-                div.innerHTML = `<div class="prayer-info"><h3>${p.name}</h3>${timeDisplay}</div><button class="${btnClass}" ${disabled ? 'disabled' : `onclick="${clickAction}"`}>${btnText}</button>`;
+                // زر حذف التسبيح المخصص
+                if (isCustom) {
+                    deleteHtml = `<button class="action-btn qadaa" style="margin-right: 5px; padding: 10px;" onclick="window.deleteCustomDhikr('${dateStr}', '${p.id}')" title="حذف التسبيح">🗑️</button>`;
+                }
+
+                div.innerHTML = `
+                    <div class="prayer-info"><h3>${p.name}</h3>${timeDisplay}</div>
+                    <div style="display:flex; align-items:center;">
+                        <button class="${btnClass}" ${disabled ? 'disabled' : `onclick="${clickAction}"`}>${btnText}</button>
+                        ${deleteHtml}
+                    </div>
+                `;
                 list.appendChild(div);
             });
+
+            // إضافة واجهة إدخال تسبيح مخصص أسفل القائمة
+            const customDhikrBlock = document.createElement('div');
+            customDhikrBlock.innerHTML = `
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 2px dashed #bdc3c7;">
+                    <div style="font-size: 0.95rem; color: var(--primary); font-weight: bold; margin-bottom: 8px;">إضافة تسبيح مخصص:</div>
+                    <div class="flex-row">
+                        <input type="text" id="custom-dhikr-input" class="styled-input" placeholder="مثال: سبحان الله 100 مرة" style="width: 75%;">
+                        <button class="settings-btn" style="width: 25%; background-color: var(--accent);" onclick="window.addCustomDhikr('${dateStr}')">إضافة ➕</button>
+                    </div>
+                </div>
+            `;
+            list.appendChild(customDhikrBlock);
+
             document.getElementById('day-modal').style.display = 'flex';
         }
 
         window.togglePrayer = function(dateStr, prayerId, type) { appData[dateStr][prayerId] = type; window.openDay(dateStr); saveToCloud(); }
         window.removePrayer = function(dateStr, prayerId) { if (confirm("هل تريد التراجع وإلغاء التسجيل؟")) { delete appData[dateStr][prayerId]; window.openDay(dateStr); saveToCloud(); } }
+
+        // دوال التحكم بالتسبيحات المخصصة
+        window.addCustomDhikr = function(dateStr) {
+            const input = document.getElementById('custom-dhikr-input');
+            const text = input.value.trim();
+            if (!text) return;
+            if (!appData[dateStr]) appData[dateStr] = {};
+            const newId = 'custom_' + Date.now();
+            appData[dateStr][newId + '_text'] = text;
+            saveToCloud();
+            window.openDay(dateStr); 
+        };
+
+        window.deleteCustomDhikr = function(dateStr, baseId) {
+            if (confirm("هل أنت متأكد من حذف هذا التسبيح؟")) {
+                delete appData[dateStr][baseId + '_text'];
+                delete appData[dateStr][baseId + '_state'];
+                saveToCloud();
+                window.openDay(dateStr);
+            }
+        };
+
+        window.toggleCustomPrayer = function(dateStr, baseId, type) {
+            appData[dateStr][baseId + '_state'] = type;
+            saveToCloud();
+            window.openDay(dateStr);
+        };
+
+        window.removeCustomPrayer = function(dateStr, baseId) {
+            if (confirm("هل تريد التراجع وإلغاء التسجيل؟")) {
+                delete appData[dateStr][baseId + '_state'];
+                saveToCloud();
+                window.openDay(dateStr);
+            }
+        };
 
         function isPrayerMissed(dateStr, pId, todayStr, nowMin) {
             if (dateStr > todayStr) return false; if (dateStr < todayStr) return true; 
