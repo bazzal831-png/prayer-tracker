@@ -1,5 +1,642 @@
 <!DOCTYPE html><!DOCTYPE html>
+<html lang="ar" dir="rtl"><!DOCTYPE html>
 <html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2c3e50">
+    <link rel="manifest" href="./manifest.json">
+    <title>مراقب الصلوات - بعلبك (سحابي ومحمي)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #f4f7f6; --primary: #2c3e50; --secondary: #34495e;
+            --accent: #2980b9; --success: #27ae60; --danger: #c0392b;
+            --warning: #e67e22; --purple: #8e44ad; --disabled: #95a5a6;
+            --text-light: #ecf0f1; --text-dark: #2c3e50; --shadow: rgba(0, 0, 0, 0.1);
+        }
+
+        html, body { height: 100%; margin: 0; padding: 0; box-sizing: border-box; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-dark); display: flex; flex-direction: column; }
+
+        header { background-color: var(--primary); color: var(--text-light); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px var(--shadow); flex-shrink: 0; }
+        h1 { margin: 0; font-size: 1.5rem; }
+
+        .settings-btn { background-color: var(--accent); color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .logout-btn { background-color: var(--danger); margin-right: 10px; }
+
+        .container { padding: 10px; max-width: 800px; margin: 0 auto; width: 100%; flex-grow: 1; display: flex; flex-direction: column; box-sizing: border-box; }
+        .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; direction: ltr; flex-shrink: 0; }
+        #current-month-display { margin: 0; }
+
+        .week-days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; direction: ltr; text-align: center; font-weight: bold; font-size: 0.8rem; color: var(--secondary); padding: 6px 0; background-color: #eef2f5; border-radius: 4px; margin-bottom: 5px; flex-shrink: 0; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 5px; direction: ltr; flex-grow: 1; overflow-y: auto; padding-bottom: 5px; }
+        .empty-day { visibility: hidden; }
+
+        .day-card { background: white; padding: 5px 2px; border-radius: 6px; text-align: center; cursor: pointer; box-shadow: 0 2px 4px var(--shadow); transition: transform 0.2s; border: 2px solid transparent; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; box-sizing: border-box; position: relative; overflow: hidden; min-height: 65px; }
+        .day-card h3 { margin: 2px 0 0 0; font-size: 0.9rem; }
+        .day-card:hover { transform: scale(1.05); border-color: var(--accent); z-index: 2; }
+        .day-card.today { background-color: #e8f4f8; border-color: var(--accent); }
+
+        .badges-container { display: flex; flex-direction: column; gap: 2px; margin-top: auto; width: 95%; box-sizing: border-box; padding-top: 4px; }
+        .event-badge { font-size: 0.55rem; color: white; padding: 2px; border-radius: 4px; line-height: 1.2; text-align: center; font-weight: bold; white-space: normal; word-wrap: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .badge-dua { background-color: #8e44ad; } 
+        .badge-event { background-color: #16a085; } 
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 20px; border-radius: 10px; width: 95%; max-width: 650px; max-height: 85vh; overflow-y: auto; }
+        .close-btn { background: var(--danger); color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; float: left; }
+
+        .prayer-item { background: #f9f9f9; margin: 10px 0; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-right: 4px solid var(--accent); }
+        .prayer-info h3 { margin: 0 0 5px 0; font-size: 1.1rem; }
+        .prayer-time { font-size: 0.9rem; color: #7f8c8d; font-weight: bold; }
+
+        .action-btn { padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; color: white; transition: 0.3s; }
+        .action-btn.adaa { background-color: var(--accent); } 
+        .action-btn.completed-adaa { background-color: var(--success); } 
+        .action-btn.qadaa { background-color: var(--danger); } 
+        .action-btn.completed-qadaa { background-color: var(--warning); color: #fff; } 
+        .action-btn.future { background-color: var(--disabled); cursor: not-allowed; } 
+        .action-btn.legacy-completed { background-color: var(--success); }
+        
+        .section-title { font-size: 1.1rem; color: var(--primary); border-bottom: 2px solid #eee; padding-bottom: 5px; margin-top: 20px; margin-bottom: 15px; text-align: right; font-weight: bold; }
+        .styled-input { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: inherit; font-size: 0.95rem; box-sizing: border-box; }
+        .flex-row { display: flex; gap: 8px; margin-bottom: 10px; }
+
+        .chart-container { position: relative; height: 300px; width: 100%; margin-top: 15px; margin-bottom: 30px; }
+        .chart-header { text-align: center; margin: 5px 0; color: var(--secondary); font-size: 0.95rem; font-weight: bold; }
+        
+        #loading-overlay, #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .loader { border: 5px solid #f3f3f3; border-top: 5px solid var(--accent); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .google-btn { background-color: #4285F4; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 1.2rem; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .google-btn:hover { background-color: #357ae8; }
+        
+        .offline-badge { display: none; background-color: var(--warning); color: white; padding: 5px 10px; border-radius: 5px; font-size: 0.8rem; font-weight: bold; margin-left: 10px; }
+    </style>
+</head>
+<body>
+    <div id="login-overlay">
+        <h1 style="color:var(--primary); margin-bottom: 30px;">مراقب الصلوات 🗓️</h1>
+        <p style="margin-bottom: 20px; color: var(--secondary);">يرجى تسجيل الدخول للوصول إلى بياناتك</p>
+        <button class="google-btn" onclick="loginWithGoogle()">
+            تسجيل الدخول باستخدام Google
+        </button>
+    </div>
+
+    <div id="loading-overlay" style="display: none;">
+        <div class="loader"></div>
+        <h3 style="margin-top:20px; color:var(--primary);">جاري تحميل التطبيق...</h3>
+    </div>
+
+    <header>
+        <div style="display: flex; align-items: center;">
+            <h1>مراقب الصلوات ☁️</h1>
+            <span id="offline-indicator" class="offline-badge">بدون إنترنت</span>
+        </div>
+        <div>
+            <button class="settings-btn logout-btn" onclick="logout()">خروج</button>
+            <button class="settings-btn" onclick="openSettings()">الإعدادات</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="controls">
+            <button onclick="changeMonth(-1)">السابق</button>
+            <h2 id="current-month-display">June 2026</h2>
+            <button onclick="changeMonth(1)">التالي</button>
+        </div>
+        
+        <div class="week-days-grid">
+            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+        </div>
+        
+        <div class="calendar-grid" id="calendar-grid"></div>
+    </div>
+
+    <div class="modal" id="day-modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeModal('day-modal')">إغلاق</button>
+            <h2 id="modal-date-title" style="margin-bottom: 15px;">تفاصيل اليوم</h2>
+            <div id="prayers-list"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="settings-modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeModal('settings-modal')">إغلاق</button>
+
+            <div class="section-title">👤 الحساب</div>
+            <p id="user-email-display" style="font-weight: bold; color: var(--accent); text-align: center;"></p>
+
+            <div class="section-title">📅 تاريخ بدء استخدام التطبيق</div>
+            <p style="font-size: 0.8rem; color: #7f8c8d; margin-top: -10px;">سيتم فصل الإحصائيات بناءً على هذا التاريخ.</p>
+            <div class="flex-row">
+                <input type="date" id="app-start-date" class="styled-input" style="width: 70%;">
+                <button class="settings-btn" style="width: 30%;" onclick="saveStartDate()">حفظ التاريخ</button>
+            </div>
+            
+            <div class="section-title">📊 إحصائيات شهر <span id="stats-month-name"></span></div>
+            <div id="current-chart-wrapper" class="chart-container" style="display: none;"><div class="chart-header">التتبع اليومي للفرائض</div><canvas id="currentChart"></canvas></div>
+            <div id="mustahab-chart-wrapper" class="chart-container" style="display: none;"><div class="chart-header">المستحبات والأدعية (إتمام فقط)</div><canvas id="mustahabChart"></canvas></div>
+            <div id="legacy-chart-wrapper" class="chart-container" style="display: none;"><div class="chart-header">سجل القضاء المتراكم</div><canvas id="legacyChart"></canvas></div>
+
+            <div class="section-title">⚡ تسجيل القضاء المجمع (رجوع بالزمن)</div>
+            <div class="flex-row">
+                <input type="number" id="bulk-year" class="styled-input" placeholder="السنة" style="width: 30%;">
+                <select id="bulk-month" class="styled-input" style="width: 35%;">
+                    <option value="1">1 (يناير)</option><option value="2">2 (فبراير)</option><option value="3">3 (مارس)</option>
+                    <option value="4">4 (أبريل)</option><option value="5">5 (مايو)</option><option value="6">6 (يونيو)</option>
+                    <option value="7">7 (يوليو)</option><option value="8">8 (أغسطس)</option><option value="9">9 (سبتمبر)</option>
+                    <option value="10">10 (أكتوبر)</option><option value="11">11 (نوفمبر)</option><option value="12">12 (ديسمبر)</option>
+                </select>
+                <select id="bulk-prayer" class="styled-input" style="width: 35%;">
+                    <option value="fajr">الصبح</option><option value="dhuhr">الظهر</option><option value="asr">العصر</option>
+                    <option value="maghrib">المغرب</option><option value="isha">العشاء</option>
+                </select>
+            </div>
+            <div class="flex-row">
+                <input type="number" id="bulk-count" class="styled-input" placeholder="عدد الصلوات" style="width: 60%;" min="1">
+                <button class="settings-btn" style="width: 40%; background-color: var(--warning);" onclick="applyBulkQadaa()">سجل القضاء ✔</button>
+            </div>
+
+            <div class="section-title">💾 إدارة البيانات</div>
+            <button class="settings-btn" style="background: var(--danger); width: 100%; margin-top: 15px; margin-bottom: 20px;" onclick="resetData()">⚠️ تصفير كافة البيانات للحساب</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+        if (localStorage.getItem('cacheVersion') !== '2') {
+            localStorage.removeItem('baalbekTimingsCache');
+            localStorage.setItem('cacheVersion', '2');
+        }
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDKiUhLEJxmamEtimAMCQZG8edlg_8QZyA",
+            authDomain: "prayer-tracker-feee2.firebaseapp.com",
+            projectId: "prayer-tracker-feee2",
+            storageBucket: "prayer-tracker-feee2.firebasestorage.app",
+            messagingSenderId: "613506250790",
+            appId: "1:613506250790:web:c839b1e0ee2e090d5ecee7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = initializeFirestore(app, {
+            localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
+        });
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        let currentUser = null;
+        let appStartDate = localStorage.getItem('appStartDate') || '2026-06-21'; 
+        let currentViewMonth = new Date().getMonth() + 1;
+        let currentViewYear = new Date().getFullYear();
+        const monthNamesEn = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+        let appData = {}; 
+        let cachedTimings = JSON.parse(localStorage.getItem('baalbekTimingsCache')) || {};
+        
+        let currentChartInstance = null; 
+        let mustahabChartInstance = null;
+        let legacyChartInstance = null;
+
+        const prayerNames = [
+            { id: 'fajr', name: 'الصبح', type: 'fard' }, { id: 'dhuhr', name: 'الظهر', type: 'fard' },
+            { id: 'asr', name: 'العصر', type: 'fard' }, { id: 'maghrib', name: 'المغرب', type: 'fard' },
+            { id: 'ghufaila', name: 'صلاة الغفيلة', type: 'nafl' }, { id: 'isha', name: 'العشاء', type: 'fard' },
+            { id: 'night', name: 'صلاة الليل', type: 'nafl' }
+        ];
+
+        // مصفوفة التسبيحات والأذكار الثابتة بناءً على أيام الأسبوع
+        window.dailyDhikr = {
+            0: [ { id: 'dhikr_sun_1', name: '📿 يا فتاح (489)' }, { id: 'dhikr_sun_2', name: '📿 يا ذا الجلال والإكرام (100)' } ], // الأحد
+            1: [ { id: 'dhikr_mon_1', name: '📿 يا لطيف (129)' }, { id: 'dhikr_mon_2', name: '📿 يا قاضي الحاجات (100)' } ], // الاثنين
+            2: [ { id: 'dhikr_tue_1', name: '📿 يا قابض (903)' }, { id: 'dhikr_tue_2', name: '📿 يا أرحم الراحمين (100)' } ], // الثلاثاء
+            3: [ { id: 'dhikr_wed_1', name: '📿 يا متعال (541)' }, { id: 'dhikr_wed_2', name: '📿 يا حي يا قيوم (100)' } ], // الأربعاء
+            4: [ { id: 'dhikr_thu_1', name: '📿 يا رزاق (308)' }, { id: 'dhikr_thu_2', name: '📿 لا إله إلا الله الحق المبين (100)' } ], // الخميس
+            5: [ { id: 'dhikr_fri_1', name: '📿 يا نور (256)' }, { id: 'dhikr_fri_2', name: '📿 اللهم صل على محمد وآل محمد وعجل فرجهم (100)' } ], // الجمعة
+            6: [ { id: 'dhikr_sat_1', name: '📿 يا غني (106)' }, { id: 'dhikr_sat_2', name: '📿 يا رب العالمين (100)' } ]  // السبت
+        };
+
+        const hijriEvents = {
+            "1-10": "عاشوراء", "2-20": "الأربعين", "2-28": "وفاة النبي (ص)", "3-17": "ولادة النبي (ص)",
+            "6-3": "شهادة الزهراء (ع)", "7-13": "ولادة الإمام علي (ع)", "7-27": "المبعث النبوي",
+            "8-15": "ولادة المهدي (عج)", "9-19": "جرح الإمام علي (ع)", "9-21": "شهادة الإمام علي (ع)",
+            "10-1": "عيد الفطر", "12-9": "يوم عرفة", "12-10": "عيد الأضحى", "12-18": "عيد الغدير"
+        };
+
+        function updateOnlineStatus() {
+            const indicator = document.getElementById('offline-indicator');
+            if (navigator.onLine) { indicator.style.display = 'none'; } 
+            else { indicator.style.display = 'inline-block'; }
+        }
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        updateOnlineStatus();
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('login-overlay').style.display = 'none';
+                document.getElementById('loading-overlay').style.display = 'flex';
+                document.getElementById('user-email-display').innerText = `مسجل الدخول كـ: ${user.email}`;
+                await loadData();
+            } else {
+                currentUser = null; appData = {};
+                document.getElementById('login-overlay').style.display = 'flex';
+                document.getElementById('loading-overlay').style.display = 'none';
+            }
+        });
+
+        window.loginWithGoogle = () => { signInWithPopup(auth, provider).catch((error) => { alert("فشل تسجيل الدخول: " + error.message); }); };
+        window.logout = () => { signOut(auth).catch((error) => { alert("حدث خطأ أثناء تسجيل الخروج"); }); };
+
+        function timeToMinutes(timeStr) {
+            if (!timeStr) return 0;
+            let parts = timeStr.split(':');
+            return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        }
+
+        async function fetchAndCacheTimings(year, month) {
+            const cacheKey = `${parseInt(year)}-${parseInt(month)}`;
+            if (!cachedTimings[cacheKey]) {
+                if (!navigator.onLine) { return; }
+                document.getElementById('loading-overlay').style.display = 'flex';
+                try {
+                    const response = await fetch(`https://api.aladhan.com/v1/calendarByCity/${year}/${month}?city=Baalbek&country=Lebanon&method=0`);
+                    const data = await response.json();
+                    if (data.code === 200) {
+                        cachedTimings[cacheKey] = {};
+                        data.data.forEach(dayData => {
+                            const dayStr = String(dayData.date.gregorian.day).padStart(2, '0');
+                            const monthStr = String(month).padStart(2, '0');
+                            const dateStr = `${year}-${monthStr}-${dayStr}`;
+                            const t = dayData.timings;
+                            const cleanTime = (timeStr) => timeStr.split(' ')[0];
+                            const hMonth = dayData.date.hijri.month.number;
+                            const hDay = parseInt(dayData.date.hijri.day, 10);
+                            
+                            cachedTimings[cacheKey][dateStr] = {
+                                fajr: cleanTime(t.Fajr), sunrise: cleanTime(t.Sunrise),
+                                dhuhr: cleanTime(t.Dhuhr), asr: cleanTime(t.Asr),
+                                maghrib: cleanTime(t.Maghrib), isha: cleanTime(t.Isha),
+                                hijriDate: `${hMonth}-${hDay}`
+                            };
+                        });
+                        localStorage.setItem('baalbekTimingsCache', JSON.stringify(cachedTimings));
+                    }
+                } catch (error) { console.error("خطأ في جلب المواقيت:", error); }
+            }
+        }
+
+        async function loadData() {
+            if (!currentUser) return;
+            try {
+                const docRef = doc(db, "Users", currentUser.uid);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) { appData = docSnap.data().records || {}; }
+                await fetchAndCacheTimings(currentViewYear, currentViewMonth);
+            } catch (error) { console.error("خطأ:", error); }
+            document.getElementById('loading-overlay').style.display = 'none';
+            renderCalendar();
+        }
+
+        function saveToCloud() {
+            if (!currentUser) return;
+            setDoc(doc(db, "Users", currentUser.uid), { records: appData }, { merge: true }).catch(err => console.error("خطأ:", err));
+        }
+
+        window.saveStartDate = function() {
+            const dateVal = document.getElementById('app-start-date').value;
+            if (dateVal) { appStartDate = dateVal; localStorage.setItem('appStartDate', appStartDate); generateStats(); alert('تم الحفظ!'); }
+        }
+
+        function renderCalendar() {
+            document.getElementById('current-month-display').innerText = `${monthNamesEn[currentViewMonth - 1]} ${currentViewYear}`;
+            const grid = document.getElementById('calendar-grid'); grid.innerHTML = '';
+            
+            const firstDayIndex = new Date(currentViewYear, currentViewMonth - 1, 1).getDay();
+            for (let j = 0; j < firstDayIndex; j++) { 
+                const emptyCard = document.createElement('div'); emptyCard.className = 'empty-day'; grid.appendChild(emptyCard); 
+            }
+            
+            const daysInMonth = new Date(currentViewYear, currentViewMonth, 0).getDate();
+            const todayStr = formatDate(new Date());
+            const cacheMonthKey = `${currentViewYear}-${currentViewMonth}`;
+
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dayStr = `${currentViewYear}-${String(currentViewMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                const card = document.createElement('div'); card.className = 'day-card';
+                if (dayStr === todayStr) card.classList.add('today');
+                
+                const dayOfWeek = new Date(currentViewYear, currentViewMonth - 1, i).getDay();
+                let badgesHtml = '';
+
+                if (dayOfWeek === 2) { badgesHtml += `<div class="event-badge badge-dua" title="دعاء التوسل">التوسل</div>`; } 
+                else if (dayOfWeek === 4) { badgesHtml += `<div class="event-badge badge-dua" title="دعاء كميل">كميل</div>`; }
+
+                if (cachedTimings[cacheMonthKey] && cachedTimings[cacheMonthKey][dayStr] && cachedTimings[cacheMonthKey][dayStr].hijriDate) {
+                    const hDate = cachedTimings[cacheMonthKey][dayStr].hijriDate;
+                    if (hijriEvents[hDate]) { badgesHtml += `<div class="event-badge badge-event" title="${hijriEvents[hDate]}">${hijriEvents[hDate]}</div>`; }
+                }
+
+                card.innerHTML = `<h3>${i}</h3><div class="badges-container">${badgesHtml}</div>`;
+                card.onclick = () => window.openDay(dayStr);
+                grid.appendChild(card);
+            }
+        }
+
+        function getPrayerEndMin(pId, dayTimings) {
+            if (!dayTimings) return 1440; 
+            if (pId === 'fajr') return dayTimings['sunrise'] ? timeToMinutes(dayTimings['sunrise']) : (dayTimings['dhuhr'] ? timeToMinutes(dayTimings['dhuhr']) : 1440);
+            if (pId === 'dhuhr' || pId === 'asr') return dayTimings['maghrib'] ? timeToMinutes(dayTimings['maghrib']) : 1440;
+            return 1440; 
+        }
+
+        window.openDay = function(dateStr) {
+            const list = document.getElementById('prayers-list');
+            const modalTitle = document.getElementById('modal-date-title');
+            list.innerHTML = '';
+            
+            const todayObj = new Date(); const todayStr = formatDate(todayObj); const nowMin = todayObj.getHours() * 60 + todayObj.getMinutes();
+            const [y, m, d] = dateStr.split('-');
+            const cacheMonthKey = `${parseInt(y)}-${parseInt(m)}`;
+            const dayTimings = cachedTimings[cacheMonthKey] ? cachedTimings[cacheMonthKey][dateStr] : null;
+            
+            let dayEventsHtml = '';
+            const dayOfWeek = new Date(parseInt(y), parseInt(m) - 1, parseInt(d)).getDay();
+            if (dayOfWeek === 2) dayEventsHtml += `<span class="event-badge badge-dua" style="display:inline-block; font-size:0.85rem; padding:4px 8px; margin-left:5px;">📖 دعاء التوسل</span>`;
+            if (dayOfWeek === 4) dayEventsHtml += `<span class="event-badge badge-dua" style="display:inline-block; font-size:0.85rem; padding:4px 8px; margin-left:5px;">📖 دعاء كميل</span>`;
+            
+            if (dayTimings && dayTimings.hijriDate && hijriEvents[dayTimings.hijriDate]) {
+                dayEventsHtml += `<span class="event-badge badge-event" style="display:inline-block; font-size:0.85rem; padding:4px 8px;">🕌 ${hijriEvents[dayTimings.hijriDate]}</span>`;
+            }
+
+            modalTitle.innerHTML = `<div>يوم: ${dateStr}</div>` + (dayEventsHtml ? `<div style="margin-top:10px; text-align:right;">${dayEventsHtml}</div>` : '');
+
+            const isFutureDay = dateStr > todayStr; const isToday = dateStr === todayStr; const isFarPast = dateStr < appStartDate;
+            if (!appData[dateStr]) appData[dateStr] = {};
+
+            // دمج الصلوات مع الأدعية والتسبيحات بحسب اليوم
+            let dayTasks = [...prayerNames];
+            if (dayOfWeek === 2) dayTasks.push({ id: 'tawassul', name: 'دعاء التوسل', type: 'dua' });
+            if (dayOfWeek === 4) dayTasks.push({ id: 'kumayl', name: 'دعاء كميل', type: 'dua' });
+
+            // إضافة الأذكار الثابتة لليوم الحالي
+            if (window.dailyDhikr[dayOfWeek]) {
+                window.dailyDhikr[dayOfWeek].forEach(dhikr => {
+                    dayTasks.push({ id: dhikr.id, name: dhikr.name, type: 'dhikr' });
+                });
+            }
+
+            // جلب الأذكار المخصصة المضافة من قبل المستخدم لهذا اليوم
+            if (appData[dateStr]) {
+                Object.keys(appData[dateStr]).forEach(key => {
+                    if (key.startsWith('custom_') && key.endsWith('_text')) {
+                        const baseId = key.replace('_text', '');
+                        dayTasks.push({ id: baseId, name: '📿 ' + appData[dateStr][key], type: 'custom_dhikr' });
+                    }
+                });
+            }
+
+            dayTasks.forEach(p => {
+                const isCustom = p.type === 'custom_dhikr';
+                const savedState = isCustom ? appData[dateStr][`${p.id}_state`] : appData[dateStr][p.id];
+
+                // إخفاء المستحبات للأيام القديمة (قبل تاريخ بدء التطبيق)
+                if (isFarPast && p.type !== 'fard') return;
+                // إخفاء المستحبات والتسبيحات إذا مر اليوم ولم يتم تسجيلها (المرونة وعدم التراكم)
+                if (dateStr < todayStr && p.type !== 'fard' && !savedState) return;
+
+                const div = document.createElement('div'); div.className = 'prayer-item';
+                let displayKey = p.id; if (p.id === 'ghufaila') displayKey = 'maghrib'; if (p.id === 'night') displayKey = 'isha';
+                let logicKey = p.id; if (p.id === 'asr') logicKey = 'dhuhr'; if (p.id === 'isha' || p.id === 'ghufaila' || p.id === 'night') logicKey = 'maghrib'; 
+
+                let timeDisplay = ''; let startMin = -1; let endMin = -1;
+                if (dayTimings && p.type !== 'dua' && p.type !== 'dhikr' && p.type !== 'custom_dhikr') {
+                    if (dayTimings[displayKey]) timeDisplay = `<div class="prayer-time">⌚ ${dayTimings[displayKey]}</div>`;
+                    if (dayTimings[logicKey]) startMin = timeToMinutes(dayTimings[logicKey]);
+                    endMin = getPrayerEndMin(p.id, dayTimings);
+                }
+
+                let btnClass = 'action-btn'; let btnText = ''; let clickAction = ''; let disabled = false;
+                let deleteHtml = '';
+
+                if (savedState) {
+                    if (p.type !== 'fard') { btnClass += ' completed-adaa'; btnText = 'تم ✔'; }
+                    else if (savedState === 'adaa') { btnClass += ' completed-adaa'; btnText = 'تمت أداءً ✔'; }
+                    else if (savedState === 'qadaa') { btnClass += ' completed-qadaa'; btnText = 'تم القضاء ✔'; }
+                    else { btnClass += ' legacy-completed'; btnText = 'تمت ✔'; } 
+                    clickAction = isCustom ? `window.removeCustomPrayer('${dateStr}', '${p.id}')` : `window.removePrayer('${dateStr}', '${p.id}')`;
+                } else {
+                    if (isFutureDay) { disabled = true; btnClass += ' future'; btnText = 'لم يحن'; } 
+                    else if (p.type !== 'fard') { 
+                        // أزرار المستحبات والتسبيحات
+                        btnClass += ' adaa'; 
+                        btnText = (p.type === 'dua' ? 'تمت القراءة' : (p.type === 'dhikr' || isCustom ? 'تم التسبيح' : 'تمت الصلاة')); 
+                        clickAction = isCustom ? `window.toggleCustomPrayer('${dateStr}', '${p.id}', 'adaa')` : `window.togglePrayer('${dateStr}', '${p.id}', 'adaa')`; 
+                    }
+                    else if (isToday) {
+                        if (startMin !== -1 && nowMin < startMin) { disabled = true; btnClass += ' future'; btnText = 'لم يحن'; } 
+                        else if (startMin !== -1 && nowMin <= endMin) { btnClass += ' adaa'; btnText = 'أداء'; clickAction = `window.togglePrayer('${dateStr}', '${p.id}', 'adaa')`; } 
+                        else { btnClass += ' qadaa'; btnText = 'قضاء'; clickAction = `window.togglePrayer('${dateStr}', '${p.id}', 'qadaa')`; }
+                    } else { btnClass += ' qadaa'; btnText = 'قضاء'; clickAction = `window.togglePrayer('${dateStr}', '${p.id}', 'qadaa')`; }
+                }
+
+                // زر حذف التسبيح المخصص
+                if (isCustom) {
+                    deleteHtml = `<button class="action-btn qadaa" style="margin-right: 5px; padding: 10px;" onclick="window.deleteCustomDhikr('${dateStr}', '${p.id}')" title="حذف التسبيح">🗑️</button>`;
+                }
+
+                div.innerHTML = `
+                    <div class="prayer-info"><h3>${p.name}</h3>${timeDisplay}</div>
+                    <div style="display:flex; align-items:center;">
+                        <button class="${btnClass}" ${disabled ? 'disabled' : `onclick="${clickAction}"`}>${btnText}</button>
+                        ${deleteHtml}
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+
+            // إضافة واجهة إدخال تسبيح مخصص أسفل القائمة
+            const customDhikrBlock = document.createElement('div');
+            customDhikrBlock.innerHTML = `
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 2px dashed #bdc3c7;">
+                    <div style="font-size: 0.95rem; color: var(--primary); font-weight: bold; margin-bottom: 8px;">إضافة تسبيح مخصص:</div>
+                    <div class="flex-row">
+                        <input type="text" id="custom-dhikr-input" class="styled-input" placeholder="مثال: سبحان الله 100 مرة" style="width: 75%;">
+                        <button class="settings-btn" style="width: 25%; background-color: var(--accent);" onclick="window.addCustomDhikr('${dateStr}')">إضافة ➕</button>
+                    </div>
+                </div>
+            `;
+            list.appendChild(customDhikrBlock);
+
+            document.getElementById('day-modal').style.display = 'flex';
+        }
+
+        window.togglePrayer = function(dateStr, prayerId, type) { appData[dateStr][prayerId] = type; window.openDay(dateStr); saveToCloud(); }
+        window.removePrayer = function(dateStr, prayerId) { if (confirm("هل تريد التراجع وإلغاء التسجيل؟")) { delete appData[dateStr][prayerId]; window.openDay(dateStr); saveToCloud(); } }
+
+        // دوال التحكم بالتسبيحات المخصصة
+        window.addCustomDhikr = function(dateStr) {
+            const input = document.getElementById('custom-dhikr-input');
+            const text = input.value.trim();
+            if (!text) return;
+            if (!appData[dateStr]) appData[dateStr] = {};
+            const newId = 'custom_' + Date.now();
+            appData[dateStr][newId + '_text'] = text;
+            saveToCloud();
+            window.openDay(dateStr); 
+        };
+
+        window.deleteCustomDhikr = function(dateStr, baseId) {
+            if (confirm("هل أنت متأكد من حذف هذا التسبيح؟")) {
+                delete appData[dateStr][baseId + '_text'];
+                delete appData[dateStr][baseId + '_state'];
+                saveToCloud();
+                window.openDay(dateStr);
+            }
+        };
+
+        window.toggleCustomPrayer = function(dateStr, baseId, type) {
+            appData[dateStr][baseId + '_state'] = type;
+            saveToCloud();
+            window.openDay(dateStr);
+        };
+
+        window.removeCustomPrayer = function(dateStr, baseId) {
+            if (confirm("هل تريد التراجع وإلغاء التسجيل؟")) {
+                delete appData[dateStr][baseId + '_state'];
+                saveToCloud();
+                window.openDay(dateStr);
+            }
+        };
+
+        function isPrayerMissed(dateStr, pId, todayStr, nowMin) {
+            if (dateStr > todayStr) return false; if (dateStr < todayStr) return true; 
+            const [y, m, d] = dateStr.split('-'); const cacheMonthKey = `${parseInt(y)}-${parseInt(m)}`;
+            const dayTimings = cachedTimings[cacheMonthKey] ? cachedTimings[cacheMonthKey][dateStr] : null;
+            if (!dayTimings) return false; return nowMin > getPrayerEndMin(pId, dayTimings);
+        }
+
+        function generateStats() {
+            document.getElementById('stats-month-name').innerText = monthNamesEn[currentViewMonth - 1];
+            document.getElementById('app-start-date').value = appStartDate;
+            
+            const fardPrayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']; const labels = ['الصبح', 'الظهر', 'العصر', 'المغرب', 'العشاء'];
+            const adaaData = [0, 0, 0, 0, 0]; const currentQadaaData = [0, 0, 0, 0, 0]; const missedData = [0, 0, 0, 0, 0]; const legacyQadaaData = [0, 0, 0, 0, 0];
+            
+            const mustahabLabels = ['الغفيلة', 'الليل', 'دعاء التوسل', 'دعاء كميل'];
+            const mustahabData = [0, 0, 0, 0];
+
+            const todayObj = new Date(); const todayStr = formatDate(todayObj); const nowMin = todayObj.getHours() * 60 + todayObj.getMinutes();
+            const daysInMonth = new Date(currentViewYear, currentViewMonth, 0).getDate();
+            let hasCurrentData = false; let hasLegacyData = false;
+
+            for(let i = 1; i <= daysInMonth; i++) {
+                const dStr = `${currentViewYear}-${String(currentViewMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                
+                if (dStr >= appStartDate) {
+                    if (dStr <= todayStr) {
+                        hasCurrentData = true;
+                        
+                        // إحصائيات الفرائض
+                        fardPrayers.forEach((pId, idx) => {
+                            let state = appData[dStr] ? appData[dStr][pId] : null;
+                            if(state === 'adaa') adaaData[idx]++; else if(state === 'qadaa') currentQadaaData[idx]++;
+                            else if(state) adaaData[idx]++; else if(isPrayerMissed(dStr, pId, todayStr, nowMin)) missedData[idx]++;
+                        });
+
+                        // إحصائيات المستحبات (تسجيل الإتمام فقط)
+                        if (appData[dStr]) {
+                            if (appData[dStr]['ghufaila'] === 'adaa') mustahabData[0]++;
+                            if (appData[dStr]['night'] === 'adaa') mustahabData[1]++;
+                            
+                            const dDay = new Date(currentViewYear, currentViewMonth - 1, i).getDay();
+                            if (dDay === 2 && appData[dStr]['tawassul'] === 'adaa') mustahabData[2]++;
+                            if (dDay === 4 && appData[dStr]['kumayl'] === 'adaa') mustahabData[3]++;
+                        }
+                    }
+                } else {
+                    hasLegacyData = true;
+                    fardPrayers.forEach((pId, idx) => {
+                        let state = appData[dStr] ? appData[dStr][pId] : null;
+                        if(state === 'qadaa' || state === 'adaa') legacyQadaaData[idx]++;
+                    });
+                }
+            }
+
+            // رسم الفرائض
+            if(currentChartInstance) currentChartInstance.destroy();
+            const wrapperCurrent = document.getElementById('current-chart-wrapper');
+            if (hasCurrentData) {
+                wrapperCurrent.style.display = 'block';
+                currentChartInstance = new Chart(document.getElementById('currentChart').getContext('2d'), {
+                    type: 'bar', data: { labels: labels, datasets: [{ label: 'أداء', data: adaaData, backgroundColor: '#27ae60' }, { label: 'قضاء', data: currentQadaaData, backgroundColor: '#e67e22' }, { label: 'فائتة', data: missedData, backgroundColor: '#c0392b' }]}, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+                });
+            } else { wrapperCurrent.style.display = 'none'; }
+
+            // رسم المستحبات والأدعية
+            if(mustahabChartInstance) mustahabChartInstance.destroy();
+            const wrapperMustahab = document.getElementById('mustahab-chart-wrapper');
+            if (hasCurrentData) {
+                wrapperMustahab.style.display = 'block';
+                mustahabChartInstance = new Chart(document.getElementById('mustahabChart').getContext('2d'), { 
+                    type: 'bar', data: { labels: mustahabLabels, datasets: [{ label: 'مرات الإتمام', data: mustahabData, backgroundColor: '#8e44ad' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } } 
+                });
+            } else { wrapperMustahab.style.display = 'none'; }
+
+            // رسم القضاء المتراكم
+            if(legacyChartInstance) legacyChartInstance.destroy();
+            const wrapperLegacy = document.getElementById('legacy-chart-wrapper');
+            if (hasLegacyData) {
+                wrapperLegacy.style.display = 'block';
+                legacyChartInstance = new Chart(document.getElementById('legacyChart').getContext('2d'), { type: 'bar', data: { labels: labels, datasets: [{ label: 'قضاء لأيام قديمة', data: legacyQadaaData, backgroundColor: '#34495e' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } } });
+            } else { wrapperLegacy.style.display = 'none'; }
+        }
+
+        window.changeMonth = async function(step) {
+            currentViewMonth += step;
+            if (currentViewMonth > 12) { currentViewMonth = 1; currentViewYear++; }
+            if (currentViewMonth < 1) { currentViewMonth = 12; currentViewYear--; }
+            if(navigator.onLine) document.getElementById('loading-overlay').style.display = 'flex';
+            await fetchAndCacheTimings(currentViewYear, currentViewMonth);
+            document.getElementById('loading-overlay').style.display = 'none';
+            renderCalendar();
+        }
+
+        function formatDate(date) { const y = date.getFullYear(); const m = String(date.getMonth() + 1).padStart(2, '0'); const d = String(date.getDate()).padStart(2, '0'); return `${y}-${m}-${d}`; }
+        window.resetData = function() { if(confirm("تحذير خطير: هل تريد مسح بيانات حسابك نهائياً من السحابة؟")) { appData = {}; saveToCloud(); renderCalendar(); window.closeModal('settings-modal'); alert("تم مسح بيانات حسابك."); } }
+        window.openSettings = function() { document.getElementById('settings-modal').style.display = 'flex'; generateStats(); document.getElementById('bulk-year').value = currentViewYear; document.getElementById('bulk-month').value = currentViewMonth; }
+        window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; }
+        
+        window.applyBulkQadaa = function() {
+            const startYear = parseInt(document.getElementById('bulk-year').value); const startMonth = parseInt(document.getElementById('bulk-month').value);
+            const prayerId = document.getElementById('bulk-prayer').value; const countInput = document.getElementById('bulk-count');
+            let remainingCount = parseInt(countInput.value);
+            if (!startYear || !startMonth || !prayerId || isNaN(remainingCount) || remainingCount <= 0) { alert("بيانات غير صحيحة."); return; }
+            const todayStr = formatDate(new Date()); let filledCount = 0; let currentYear = startYear; let currentMonth = startMonth; let maxMonthsToSearch = 120; 
+            while (remainingCount > 0 && maxMonthsToSearch > 0) {
+                maxMonthsToSearch--; const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+                for (let i = daysInMonth; i >= 1; i--) {
+                    if (remainingCount === 0) break; 
+                    const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    if (dateStr >= todayStr) continue;
+                    if (!appData[dateStr]) appData[dateStr] = {};
+                    if (!appData[dateStr][prayerId]) { appData[dateStr][prayerId] = 'qadaa'; remainingCount--; filledCount++; }
+                }
+                if (remainingCount > 0) { currentMonth--; if (currentMonth === 0) { currentMonth = 12; currentYear--; } }
+            }
+            saveToCloud(); renderCalendar(); generateStats(); 
+            alert(`✅ تم تسجيل ${filledCount} صلاة قضاء، سيتم مزامنتها سحابياً!`); countInput.value = ''; 
+        }
+    </script>
+</body>
+</html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
