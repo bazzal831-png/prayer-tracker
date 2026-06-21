@@ -51,9 +51,6 @@
         .action-btn.completed-qadaa { background-color: var(--warning); color: #fff; } 
         .action-btn.future { background-color: var(--disabled); cursor: not-allowed; } 
         .action-btn.legacy-completed { background-color: var(--success); }
-
-        .file-upload-btn { background-color: var(--secondary); color: white; padding: 10px; border-radius: 5px; cursor: pointer; display: block; text-align: center; margin-bottom: 10px; font-weight: bold; }
-        input[type="file"] { display: none; }
         
         .section-title { font-size: 1.1rem; color: var(--primary); border-bottom: 2px solid #eee; padding-bottom: 5px; margin-top: 20px; margin-bottom: 15px; text-align: right; font-weight: bold; }
         .styled-input { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: inherit; font-size: 0.95rem; box-sizing: border-box; }
@@ -81,7 +78,7 @@
 
     <div id="loading-overlay" style="display: none;">
         <div class="loader"></div>
-        <h3 style="margin-top:20px; color:var(--primary);">جاري المزامنة مع السحابة...</h3>
+        <h3 style="margin-top:20px; color:var(--primary);">جاري المزامنة...</h3>
     </div>
 
     <header>
@@ -131,9 +128,6 @@
             <div class="section-title">📊 إحصائيات شهر <span id="stats-month-name"></span></div>
             <div id="current-chart-wrapper" class="chart-container" style="display: none;"><div class="chart-header">التتبع اليومي</div><canvas id="currentChart"></canvas></div>
             <div id="legacy-chart-wrapper" class="chart-container" style="display: none;"><div class="chart-header">سجل القضاء المتراكم</div><canvas id="legacyChart"></canvas></div>
-            
-            <div class="section-title">🗓️ مواقيت الصلوات</div>
-            <label class="file-upload-btn">📥 استيراد ودمج مواقيت جديدة <input type="file" accept=".json" onchange="importJSON(event)"></label>
 
             <div class="section-title">⚡ تسجيل القضاء المجمع (رجوع بالزمن)</div>
             <div class="flex-row">
@@ -154,9 +148,7 @@
                 <button class="settings-btn" style="width: 40%; background-color: var(--warning);" onclick="applyBulkQadaa()">سجل القضاء ✔</button>
             </div>
 
-            <div class="section-title">💾 بياناتي (محفوظة سحابياً)</div>
-            <button class="settings-btn" style="background: var(--success); width: 100%; margin-bottom: 10px;" onclick="exportUserData()">📤 حفظ نسخة احتياطية محلية</button>
-            <label class="file-upload-btn" style="background-color: var(--accent);">📥 استعادة ودمج سجل قديم<input type="file" accept=".json" onchange="importUserData(event)"></label>
+            <div class="section-title">💾 إدارة البيانات</div>
             <button class="settings-btn" style="background: var(--danger); width: 100%; margin-top: 15px; margin-bottom: 20px;" onclick="resetData()">⚠️ تصفير كافة البيانات للحساب</button>
         </div>
     </div>
@@ -187,7 +179,7 @@
         const monthNamesEn = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
         let appData = {}; 
-        let customTimings = JSON.parse(localStorage.getItem('baalbekTimings')) || {};
+        let cachedTimings = JSON.parse(localStorage.getItem('baalbekTimingsCache')) || {};
         
         let currentChartInstance = null; let legacyChartInstance = null;
 
@@ -232,6 +224,40 @@
             return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
         }
 
+        async function fetchAndCacheTimings(year, month) {
+            const cacheKey = `${parseInt(year)}-${parseInt(month)}`;
+            if (!cachedTimings[cacheKey]) {
+                document.getElementById('loading-overlay').style.display = 'flex';
+                try {
+                    const response = await fetch(`https://api.aladhan.com/v1/calendarByCity/${year}/${month}?city=Baalbek&country=Lebanon&method=0`);
+                    const data = await response.json();
+                    if (data.code === 200) {
+                        cachedTimings[cacheKey] = {};
+                        data.data.forEach(dayData => {
+                            const dayStr = String(dayData.date.gregorian.day).padStart(2, '0');
+                            const monthStr = String(month).padStart(2, '0');
+                            const dateStr = `${year}-${monthStr}-${dayStr}`;
+                            const t = dayData.timings;
+                            
+                            const cleanTime = (timeStr) => timeStr.split(' ')[0];
+                            
+                            cachedTimings[cacheKey][dateStr] = {
+                                fajr: cleanTime(t.Fajr),
+                                sunrise: cleanTime(t.Sunrise),
+                                dhuhr: cleanTime(t.Dhuhr),
+                                asr: cleanTime(t.Asr),
+                                maghrib: cleanTime(t.Maghrib),
+                                isha: cleanTime(t.Isha)
+                            };
+                        });
+                        localStorage.setItem('baalbekTimingsCache', JSON.stringify(cachedTimings));
+                    }
+                } catch (error) {
+                    console.error("خطأ في جلب المواقيت عبر الـ API:", error);
+                }
+            }
+        }
+
         async function loadData() {
             if (!currentUser) return;
             try {
@@ -240,14 +266,10 @@
                 
                 if (docSnap.exists()) {
                     appData = docSnap.data().records || {};
-                } else {
-                    let localData = JSON.parse(localStorage.getItem('prayerData_v1'));
-                    if (localData && Object.keys(localData).length > 0) {
-                        appData = localData;
-                        await saveToCloud();
-                        localStorage.removeItem('prayerData_v1'); 
-                    }
                 }
+                
+                await fetchAndCacheTimings(currentViewYear, currentViewMonth);
+                
             } catch (error) {
                 console.error("خطأ في الاتصال بالسحابة:", error);
                 alert("حدث خطأ في تحميل بياناتك من السحابة.");
@@ -268,19 +290,6 @@
         window.saveStartDate = function() {
             const dateVal = document.getElementById('app-start-date').value;
             if (dateVal) { appStartDate = dateVal; localStorage.setItem('appStartDate', appStartDate); generateStats(); alert('تم الحفظ!'); }
-        }
-
-        window.importJSON = function(event) {
-            const file = event.target.files[0]; if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const json = JSON.parse(e.target.result);
-                    customTimings = { ...customTimings, ...json };
-                    localStorage.setItem('baalbekTimings', JSON.stringify(customTimings));
-                    alert("تم الاستيراد بنجاح!");
-                } catch (err) { alert("خطأ في الملف"); }
-            }; reader.readAsText(file); event.target.value = ''; 
         }
 
         function renderCalendar() {
@@ -313,7 +322,11 @@
             document.getElementById('modal-date-title').innerText = `صلوات يوم: ${dateStr}`;
             list.innerHTML = '';
             const todayObj = new Date(); const todayStr = formatDate(todayObj); const nowMin = todayObj.getHours() * 60 + todayObj.getMinutes();
-            const dayTimings = customTimings[dateStr] || null;
+            
+            const [y, m, d] = dateStr.split('-');
+            const cacheMonthKey = `${parseInt(y)}-${parseInt(m)}`;
+            const dayTimings = cachedTimings[cacheMonthKey] ? cachedTimings[cacheMonthKey][dateStr] : null;
+            
             const isFutureDay = dateStr > todayStr; const isToday = dateStr === todayStr; const isFarPast = dateStr < appStartDate;
 
             if (!appData[dateStr]) appData[dateStr] = {};
@@ -371,7 +384,12 @@
 
         function isPrayerMissed(dateStr, pId, todayStr, nowMin) {
             if (dateStr > todayStr) return false; if (dateStr < todayStr) return true; 
-            const dayTimings = customTimings[dateStr] || null; if (!dayTimings) return false; 
+            
+            const [y, m, d] = dateStr.split('-');
+            const cacheMonthKey = `${parseInt(y)}-${parseInt(m)}`;
+            const dayTimings = cachedTimings[cacheMonthKey] ? cachedTimings[cacheMonthKey][dateStr] : null;
+            
+            if (!dayTimings) return false; 
             return nowMin > getPrayerEndMin(pId, dayTimings);
         }
 
@@ -429,10 +447,13 @@
             } else { wrapperLegacy.style.display = 'none'; }
         }
 
-        window.changeMonth = function(step) {
+        window.changeMonth = async function(step) {
             currentViewMonth += step;
             if (currentViewMonth > 12) { currentViewMonth = 1; currentViewYear++; }
             if (currentViewMonth < 1) { currentViewMonth = 12; currentViewYear--; }
+            document.getElementById('loading-overlay').style.display = 'flex';
+            await fetchAndCacheTimings(currentViewYear, currentViewMonth);
+            document.getElementById('loading-overlay').style.display = 'none';
             renderCalendar();
         }
 
@@ -480,33 +501,6 @@
             document.getElementById('loading-overlay').style.display = 'none';
             renderCalendar(); generateStats(); 
             alert(`✅ تم تسجيل ${filledCount} صلاة قضاء وحفظها سحابياً لحسابك!`); countInput.value = ''; 
-        }
-
-        window.exportUserData = function() {
-            if (Object.keys(appData).length === 0) { alert("لا توجد بيانات لتصديرها."); return; }
-            const blob = new Blob([JSON.stringify(appData, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `MyPrayers_Backup_${formatDate(new Date())}.json`;
-            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-        }
-
-        window.importUserData = async function(event) {
-            const file = event.target.files[0]; if (!file) return;
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                try {
-                    const json = JSON.parse(e.target.result);
-                    if (typeof json === 'object' && json !== null) {
-                        for (let dateKey in json) {
-                            if (!appData[dateKey]) appData[dateKey] = {};
-                            for (let prayerKey in json[dateKey]) { appData[dateKey][prayerKey] = json[dateKey][prayerKey]; }
-                        }
-                        document.getElementById('loading-overlay').style.display = 'flex';
-                        await saveToCloud();
-                        document.getElementById('loading-overlay').style.display = 'none';
-                        renderCalendar(); generateStats(); alert("تم دمج السجل القديم ورفعه للسحابة لحسابك بنجاح!");
-                    }
-                } catch (err) { alert("خطأ في الملف"); document.getElementById('loading-overlay').style.display = 'none';}
-            }; reader.readAsText(file); event.target.value = ''; 
         }
 
     </script>
