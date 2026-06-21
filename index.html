@@ -36,7 +36,6 @@
         .day-card:hover { transform: scale(1.05); border-color: var(--accent); z-index: 2; }
         .day-card.today { background-color: #e8f4f8; border-color: var(--accent); }
 
-        /* التعديل هنا: السماح للنص بالتفاف لسطرين ليكون مقروءاً */
         .badges-container { display: flex; flex-direction: column; gap: 2px; margin-top: auto; width: 95%; box-sizing: border-box; padding-top: 4px; }
         .event-badge { font-size: 0.55rem; color: white; padding: 2px; border-radius: 4px; line-height: 1.2; text-align: center; font-weight: bold; white-space: normal; word-wrap: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .badge-dua { background-color: #8e44ad; } 
@@ -137,7 +136,8 @@
             </div>
             
             <div class="section-title">📊 إحصائيات شهر <span id="stats-month-name"></span></div>
-            <div id="current-chart-wrapper" class="chart-container" style="display: none;"><div class="chart-header">التتبع اليومي</div><canvas id="currentChart"></canvas></div>
+            <div id="current-chart-wrapper" class="chart-container" style="display: none;"><div class="chart-header">التتبع اليومي للفرائض</div><canvas id="currentChart"></canvas></div>
+            <div id="mustahab-chart-wrapper" class="chart-container" style="display: none;"><div class="chart-header">المستحبات والأدعية (إتمام فقط)</div><canvas id="mustahabChart"></canvas></div>
             <div id="legacy-chart-wrapper" class="chart-container" style="display: none;"><div class="chart-header">سجل القضاء المتراكم</div><canvas id="legacyChart"></canvas></div>
 
             <div class="section-title">⚡ تسجيل القضاء المجمع (رجوع بالزمن)</div>
@@ -199,7 +199,9 @@
         let appData = {}; 
         let cachedTimings = JSON.parse(localStorage.getItem('baalbekTimingsCache')) || {};
         
-        let currentChartInstance = null; let legacyChartInstance = null;
+        let currentChartInstance = null; 
+        let mustahabChartInstance = null;
+        let legacyChartInstance = null;
 
         const prayerNames = [
             { id: 'fajr', name: 'الصبح', type: 'fard' }, { id: 'dhuhr', name: 'الظهر', type: 'fard' },
@@ -209,20 +211,10 @@
         ];
 
         const hijriEvents = {
-            "1-10": "عاشوراء",
-            "2-20": "الأربعين",
-            "2-28": "وفاة النبي (ص)",
-            "3-17": "ولادة النبي (ص)",
-            "6-3": "شهادة الزهراء (ع)",
-            "7-13": "ولادة الإمام علي (ع)",
-            "7-27": "المبعث النبوي",
-            "8-15": "ولادة المهدي (عج)",
-            "9-19": "جرح الإمام علي (ع)",
-            "9-21": "شهادة الإمام علي (ع)",
-            "10-1": "عيد الفطر",
-            "12-9": "يوم عرفة",
-            "12-10": "عيد الأضحى",
-            "12-18": "عيد الغدير"
+            "1-10": "عاشوراء", "2-20": "الأربعين", "2-28": "وفاة النبي (ص)", "3-17": "ولادة النبي (ص)",
+            "6-3": "شهادة الزهراء (ع)", "7-13": "ولادة الإمام علي (ع)", "7-27": "المبعث النبوي",
+            "8-15": "ولادة المهدي (عج)", "9-19": "جرح الإمام علي (ع)", "9-21": "شهادة الإمام علي (ع)",
+            "10-1": "عيد الفطر", "12-9": "يوم عرفة", "12-10": "عيد الأضحى", "12-18": "عيد الغدير"
         };
 
         function updateOnlineStatus() {
@@ -363,7 +355,6 @@
             const cacheMonthKey = `${parseInt(y)}-${parseInt(m)}`;
             const dayTimings = cachedTimings[cacheMonthKey] ? cachedTimings[cacheMonthKey][dateStr] : null;
             
-            // التعديل هنا: إضافة المناسبات بشكل واضح في عنوان النافذة
             let dayEventsHtml = '';
             const dayOfWeek = new Date(parseInt(y), parseInt(m) - 1, parseInt(d)).getDay();
             if (dayOfWeek === 2) dayEventsHtml += `<span class="event-badge badge-dua" style="display:inline-block; font-size:0.85rem; padding:4px 8px; margin-left:5px;">📖 دعاء التوسل</span>`;
@@ -378,17 +369,24 @@
             const isFutureDay = dateStr > todayStr; const isToday = dateStr === todayStr; const isFarPast = dateStr < appStartDate;
             if (!appData[dateStr]) appData[dateStr] = {};
 
-            prayerNames.forEach(p => {
+            // دمج الصلوات مع الأدعية بحسب اليوم
+            let dayTasks = [...prayerNames];
+            if (dayOfWeek === 2) dayTasks.push({ id: 'tawassul', name: 'دعاء التوسل', type: 'dua' });
+            if (dayOfWeek === 4) dayTasks.push({ id: 'kumayl', name: 'دعاء كميل', type: 'dua' });
+
+            dayTasks.forEach(p => {
                 const savedState = appData[dateStr][p.id]; 
-                if (isFarPast && p.type === 'nafl') return;
-                if (dateStr < todayStr && p.type === 'nafl' && !savedState) return;
+                // إخفاء المستحبات للأيام القديمة (قبل تاريخ بدء التطبيق)
+                if (isFarPast && p.type !== 'fard') return;
+                // إخفاء المستحبات إذا مر اليوم ولم يتم تسجيلها (المرونة)
+                if (dateStr < todayStr && p.type !== 'fard' && !savedState) return;
 
                 const div = document.createElement('div'); div.className = 'prayer-item';
                 let displayKey = p.id; if (p.id === 'ghufaila') displayKey = 'maghrib'; if (p.id === 'night') displayKey = 'isha';
                 let logicKey = p.id; if (p.id === 'asr') logicKey = 'dhuhr'; if (p.id === 'isha' || p.id === 'ghufaila' || p.id === 'night') logicKey = 'maghrib'; 
 
                 let timeDisplay = ''; let startMin = -1; let endMin = -1;
-                if (dayTimings) {
+                if (dayTimings && p.type !== 'dua') {
                     if (dayTimings[displayKey]) timeDisplay = `<div class="prayer-time">⌚ ${dayTimings[displayKey]}</div>`;
                     if (dayTimings[logicKey]) startMin = timeToMinutes(dayTimings[logicKey]);
                     endMin = getPrayerEndMin(p.id, dayTimings);
@@ -396,12 +394,18 @@
 
                 let btnClass = 'action-btn'; let btnText = ''; let clickAction = ''; let disabled = false;
                 if (savedState) {
-                    if (savedState === 'adaa') { btnClass += ' completed-adaa'; btnText = 'تمت أداءً ✔'; }
+                    if (p.type !== 'fard') { btnClass += ' completed-adaa'; btnText = 'تم ✔'; }
+                    else if (savedState === 'adaa') { btnClass += ' completed-adaa'; btnText = 'تمت أداءً ✔'; }
                     else if (savedState === 'qadaa') { btnClass += ' completed-qadaa'; btnText = 'تم القضاء ✔'; }
                     else { btnClass += ' legacy-completed'; btnText = 'تمت ✔'; } 
                     clickAction = `window.removePrayer('${dateStr}', '${p.id}')`;
                 } else {
                     if (isFutureDay) { disabled = true; btnClass += ' future'; btnText = 'لم يحن'; } 
+                    else if (p.type !== 'fard') { 
+                        // أزرار المستحبات تظهر فقط "أداء" ولا يوجد لها "قضاء"
+                        btnClass += ' adaa'; btnText = (p.type === 'dua' ? 'تمت القراءة' : 'تمت الصلاة'); 
+                        clickAction = `window.togglePrayer('${dateStr}', '${p.id}', 'adaa')`; 
+                    }
                     else if (isToday) {
                         if (startMin !== -1 && nowMin < startMin) { disabled = true; btnClass += ' future'; btnText = 'لم يحن'; } 
                         else if (startMin !== -1 && nowMin <= endMin) { btnClass += ' adaa'; btnText = 'أداء'; clickAction = `window.togglePrayer('${dateStr}', '${p.id}', 'adaa')`; } 
@@ -416,7 +420,7 @@
         }
 
         window.togglePrayer = function(dateStr, prayerId, type) { appData[dateStr][prayerId] = type; window.openDay(dateStr); saveToCloud(); }
-        window.removePrayer = function(dateStr, prayerId) { if (confirm("هل تريد التراجع وإلغاء تسجيل هذه الصلاة؟")) { delete appData[dateStr][prayerId]; window.openDay(dateStr); saveToCloud(); } }
+        window.removePrayer = function(dateStr, prayerId) { if (confirm("هل تريد التراجع وإلغاء التسجيل؟")) { delete appData[dateStr][prayerId]; window.openDay(dateStr); saveToCloud(); } }
 
         function isPrayerMissed(dateStr, pId, todayStr, nowMin) {
             if (dateStr > todayStr) return false; if (dateStr < todayStr) return true; 
@@ -428,22 +432,40 @@
         function generateStats() {
             document.getElementById('stats-month-name').innerText = monthNamesEn[currentViewMonth - 1];
             document.getElementById('app-start-date').value = appStartDate;
+            
             const fardPrayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']; const labels = ['الصبح', 'الظهر', 'العصر', 'المغرب', 'العشاء'];
             const adaaData = [0, 0, 0, 0, 0]; const currentQadaaData = [0, 0, 0, 0, 0]; const missedData = [0, 0, 0, 0, 0]; const legacyQadaaData = [0, 0, 0, 0, 0];
+            
+            const mustahabLabels = ['الغفيلة', 'الليل', 'دعاء التوسل', 'دعاء كميل'];
+            const mustahabData = [0, 0, 0, 0];
+
             const todayObj = new Date(); const todayStr = formatDate(todayObj); const nowMin = todayObj.getHours() * 60 + todayObj.getMinutes();
             const daysInMonth = new Date(currentViewYear, currentViewMonth, 0).getDate();
             let hasCurrentData = false; let hasLegacyData = false;
 
             for(let i = 1; i <= daysInMonth; i++) {
                 const dStr = `${currentViewYear}-${String(currentViewMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                
                 if (dStr >= appStartDate) {
                     if (dStr <= todayStr) {
                         hasCurrentData = true;
+                        
+                        // إحصائيات الفرائض
                         fardPrayers.forEach((pId, idx) => {
                             let state = appData[dStr] ? appData[dStr][pId] : null;
                             if(state === 'adaa') adaaData[idx]++; else if(state === 'qadaa') currentQadaaData[idx]++;
                             else if(state) adaaData[idx]++; else if(isPrayerMissed(dStr, pId, todayStr, nowMin)) missedData[idx]++;
                         });
+
+                        // إحصائيات المستحبات (تسجيل الإتمام فقط)
+                        if (appData[dStr]) {
+                            if (appData[dStr]['ghufaila'] === 'adaa') mustahabData[0]++;
+                            if (appData[dStr]['night'] === 'adaa') mustahabData[1]++;
+                            
+                            const dDay = new Date(currentViewYear, currentViewMonth - 1, i).getDay();
+                            if (dDay === 2 && appData[dStr]['tawassul'] === 'adaa') mustahabData[2]++;
+                            if (dDay === 4 && appData[dStr]['kumayl'] === 'adaa') mustahabData[3]++;
+                        }
                     }
                 } else {
                     hasLegacyData = true;
@@ -454,6 +476,7 @@
                 }
             }
 
+            // رسم الفرائض
             if(currentChartInstance) currentChartInstance.destroy();
             const wrapperCurrent = document.getElementById('current-chart-wrapper');
             if (hasCurrentData) {
@@ -463,11 +486,22 @@
                 });
             } else { wrapperCurrent.style.display = 'none'; }
 
+            // رسم المستحبات والأدعية
+            if(mustahabChartInstance) mustahabChartInstance.destroy();
+            const wrapperMustahab = document.getElementById('mustahab-chart-wrapper');
+            if (hasCurrentData) {
+                wrapperMustahab.style.display = 'block';
+                mustahabChartInstance = new Chart(document.getElementById('mustahabChart').getContext('2d'), { 
+                    type: 'bar', data: { labels: mustahabLabels, datasets: [{ label: 'مرات الإتمام', data: mustahabData, backgroundColor: '#8e44ad' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } } 
+                });
+            } else { wrapperMustahab.style.display = 'none'; }
+
+            // رسم القضاء المتراكم
             if(legacyChartInstance) legacyChartInstance.destroy();
             const wrapperLegacy = document.getElementById('legacy-chart-wrapper');
             if (hasLegacyData) {
                 wrapperLegacy.style.display = 'block';
-                legacyChartInstance = new Chart(document.getElementById('legacyChart').getContext('2d'), { type: 'bar', data: { labels: labels, datasets: [{ label: 'قضاء لأيام قديمة', data: legacyQadaaData, backgroundColor: '#8e44ad' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } } });
+                legacyChartInstance = new Chart(document.getElementById('legacyChart').getContext('2d'), { type: 'bar', data: { labels: labels, datasets: [{ label: 'قضاء لأيام قديمة', data: legacyQadaaData, backgroundColor: '#34495e' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } } });
             } else { wrapperLegacy.style.display = 'none'; }
         }
 
