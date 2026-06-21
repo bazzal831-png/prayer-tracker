@@ -5,31 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#2c3e50">
     <link rel="manifest" href="./manifest.json">
-    <title>مراقب الصلوات - بعلبك</title>
+    <title>مراقب الصلوات - بعلبك (سحابي ومحمي)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --bg-color: #f4f7f6;
-            --primary: #2c3e50;
-            --secondary: #34495e;
-            --accent: #2980b9;    /* أزرق */
-            --success: #27ae60;   /* أخضر */
-            --danger: #c0392b;    /* أحمر */
-            --warning: #e67e22;   /* برتقالي */
-            --purple: #8e44ad;    /* بنفسجي للقضاء القديم */
-            --disabled: #95a5a6;  /* رمادي */
-            --text-light: #ecf0f1;
-            --text-dark: #2c3e50;
-            --shadow: rgba(0, 0, 0, 0.1);
+            --bg-color: #f4f7f6; --primary: #2c3e50; --secondary: #34495e;
+            --accent: #2980b9; --success: #27ae60; --danger: #c0392b;
+            --warning: #e67e22; --purple: #8e44ad; --disabled: #95a5a6;
+            --text-light: #ecf0f1; --text-dark: #2c3e50; --shadow: rgba(0, 0, 0, 0.1);
         }
 
-        html, body { height: 100%; margin: 0; padding: 0; box-sizing: border-box; overflow: hidden; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-dark); display: flex; flex-direction: column; }
+        html, body { height: 100%; margin: 0; padding: 0; box-sizing: border-box; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-dark); display: flex; flex-direction: column; }
 
         header { background-color: var(--primary); color: var(--text-light); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px var(--shadow); flex-shrink: 0; }
         h1 { margin: 0; font-size: 1.5rem; }
 
         .settings-btn { background-color: var(--accent); color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .logout-btn { background-color: var(--danger); margin-right: 10px; }
 
         .container { padding: 10px; max-width: 800px; margin: 0 auto; width: 100%; flex-grow: 1; display: flex; flex-direction: column; box-sizing: border-box; }
         .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; direction: ltr; flex-shrink: 0; }
@@ -69,20 +61,45 @@
 
         .chart-container { position: relative; height: 300px; width: 100%; margin-top: 15px; margin-bottom: 30px; }
         .chart-header { text-align: center; margin: 5px 0; color: var(--secondary); font-size: 0.95rem; font-weight: bold; }
+        
+        /* شاشات التحميل وتسجيل الدخول */
+        #loading-overlay, #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .loader { border: 5px solid #f3f3f3; border-top: 5px solid var(--accent); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .google-btn { background-color: #4285F4; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 1.2rem; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .google-btn:hover { background-color: #357ae8; }
     </style>
 </head>
 <body>
+    <!-- واجهة تسجيل الدخول -->
+    <div id="login-overlay">
+        <h1 style="color:var(--primary); margin-bottom: 30px;">مراقب الصلوات 🗓️</h1>
+        <p style="margin-bottom: 20px; color: var(--secondary);">يرجى تسجيل الدخول للوصول إلى بياناتك</p>
+        <button class="google-btn" onclick="loginWithGoogle()">
+            تسجيل الدخول باستخدام Google
+        </button>
+    </div>
+
+    <!-- واجهة التحميل -->
+    <div id="loading-overlay" style="display: none;">
+        <div class="loader"></div>
+        <h3 style="margin-top:20px; color:var(--primary);">جاري المزامنة مع السحابة...</h3>
+    </div>
 
     <header>
-        <h1>مراقب الصلوات - بعلبك 🗓️</h1>
-        <button class="settings-btn" onclick="openSettings()">الإحصائيات والإعدادات</button>
+        <h1>مراقب الصلوات ☁️</h1>
+        <div>
+            <button class="settings-btn logout-btn" onclick="logout()">خروج</button>
+            <button class="settings-btn" onclick="openSettings()">الإعدادات</button>
+        </div>
     </header>
 
     <div class="container">
         <div class="controls">
-            <button onclick="changeMonth(-1)">Previous</button>
+            <button onclick="changeMonth(-1)">السابق</button>
             <h2 id="current-month-display">June 2026</h2>
-            <button onclick="changeMonth(1)">Next</button>
+            <button onclick="changeMonth(1)">التالي</button>
         </div>
         
         <div class="week-days-grid">
@@ -104,104 +121,119 @@
         <div class="modal-content">
             <button class="close-btn" onclick="closeModal('settings-modal')">إغلاق</button>
 
+            <div class="section-title">👤 الحساب</div>
+            <p id="user-email-display" style="font-weight: bold; color: var(--accent); text-align: center;"></p>
+
             <div class="section-title">📅 تاريخ بدء استخدام التطبيق</div>
-            <p style="font-size: 0.8rem; color: #7f8c8d; margin-top: -10px;">سيتم فصل الإحصائيات بناءً على هذا التاريخ. ما قبله يُحسب "سجل قضاء قديم" وما بعده يُحسب "تتبع يومي".</p>
+            <p style="font-size: 0.8rem; color: #7f8c8d; margin-top: -10px;">سيتم فصل الإحصائيات بناءً على هذا التاريخ.</p>
             <div class="flex-row">
                 <input type="date" id="app-start-date" class="styled-input" style="width: 70%;">
                 <button class="settings-btn" style="width: 30%;" onclick="saveStartDate()">حفظ التاريخ</button>
             </div>
             
             <div class="section-title">📊 إحصائيات شهر <span id="stats-month-name"></span></div>
+            <div id="current-chart-wrapper" class="chart-container" style="display: none;"><div class="chart-header">التتبع اليومي</div><canvas id="currentChart"></canvas></div>
+            <div id="legacy-chart-wrapper" class="chart-container" style="display: none;"><div class="chart-header">سجل القضاء المتراكم</div><canvas id="legacyChart"></canvas></div>
             
-            <div id="current-chart-wrapper" class="chart-container" style="display: none;">
-                <div class="chart-header">التتبع اليومي (من تاريخ البدء فصاعداً)</div>
-                <canvas id="currentChart"></canvas>
-            </div>
-
-            <div id="legacy-chart-wrapper" class="chart-container" style="display: none;">
-                <div class="chart-header">سجل القضاء المتراكم (ما قبل تاريخ البدء)</div>
-                <canvas id="legacyChart"></canvas>
-            </div>
-            
-            <div class="section-title">🗓️ مواقيت الصلوات (بعلبك)</div>
-            <label class="file-upload-btn">
-                📥 استيراد ودمج مواقيت جديدة (ملف JSON)
-                <input type="file" accept=".json" onchange="importJSON(event)">
-            </label>
+            <div class="section-title">🗓️ مواقيت الصلوات</div>
+            <label class="file-upload-btn">📥 استيراد ودمج مواقيت جديدة <input type="file" accept=".json" onchange="importJSON(event)"></label>
 
             <div class="section-title">⚡ تسجيل القضاء المجمع (رجوع بالزمن)</div>
-            <p style="font-size: 0.8rem; color: #7f8c8d; margin-top: -10px;">سيقوم النظام بتعبئة الفراغات للوراء تلقائياً، ويتخطى الأيام المسجلة سابقاً.</p>
             <div class="flex-row">
                 <input type="number" id="bulk-year" class="styled-input" placeholder="السنة" style="width: 30%;">
                 <select id="bulk-month" class="styled-input" style="width: 35%;">
-                    <option value="1">1 (يناير)</option>
-                    <option value="2">2 (فبراير)</option>
-                    <option value="3">3 (مارس)</option>
-                    <option value="4">4 (أبريل)</option>
-                    <option value="5">5 (مايو)</option>
-                    <option value="6">6 (يونيو)</option>
-                    <option value="7">7 (يوليو)</option>
-                    <option value="8">8 (أغسطس)</option>
-                    <option value="9">9 (سبتمبر)</option>
-                    <option value="10">10 (أكتوبر)</option>
-                    <option value="11">11 (نوفمبر)</option>
-                    <option value="12">12 (ديسمبر)</option>
+                    <option value="1">1 (يناير)</option><option value="2">2 (فبراير)</option><option value="3">3 (مارس)</option>
+                    <option value="4">4 (أبريل)</option><option value="5">5 (مايو)</option><option value="6">6 (يونيو)</option>
+                    <option value="7">7 (يوليو)</option><option value="8">8 (أغسطس)</option><option value="9">9 (سبتمبر)</option>
+                    <option value="10">10 (أكتوبر)</option><option value="11">11 (نوفمبر)</option><option value="12">12 (ديسمبر)</option>
                 </select>
                 <select id="bulk-prayer" class="styled-input" style="width: 35%;">
-                    <option value="fajr">الصبح</option>
-                    <option value="dhuhr">الظهر</option>
-                    <option value="asr">العصر</option>
-                    <option value="maghrib">المغرب</option>
-                    <option value="isha">العشاء</option>
+                    <option value="fajr">الصبح</option><option value="dhuhr">الظهر</option><option value="asr">العصر</option>
+                    <option value="maghrib">المغرب</option><option value="isha">العشاء</option>
                 </select>
             </div>
             <div class="flex-row">
-                <input type="number" id="bulk-count" class="styled-input" placeholder="عدد الصلوات (مثال: 33)" style="width: 60%;" min="1">
+                <input type="number" id="bulk-count" class="styled-input" placeholder="عدد الصلوات" style="width: 60%;" min="1">
                 <button class="settings-btn" style="width: 40%; background-color: var(--warning);" onclick="applyBulkQadaa()">سجل القضاء ✔</button>
             </div>
 
-            <div class="section-title">💾 بياناتي وسجل العبادات الشخصي</div>
-            <button class="settings-btn" style="background: var(--success); width: 100%; margin-bottom: 10px;" onclick="exportUserData()">
-                📤 حفظ نسخة احتياطية من سجل صلواتي
-            </button>
-            <label class="file-upload-btn" style="background-color: var(--accent);">
-                📥 استعادة ودمج سجل صلواتي القديم
-                <input type="file" accept=".json" onchange="importUserData(event)">
-            </label>
-            
-            <button class="settings-btn" style="background: var(--danger); width: 100%; margin-top: 15px; margin-bottom: 20px;" onclick="resetData()">
-                ⚠️ تصفير كافة البيانات (Reset)
-            </button>
+            <div class="section-title">💾 بياناتي (محفوظة سحابياً)</div>
+            <button class="settings-btn" style="background: var(--success); width: 100%; margin-bottom: 10px;" onclick="exportUserData()">📤 حفظ نسخة احتياطية محلية</button>
+            <label class="file-upload-btn" style="background-color: var(--accent);">📥 استعادة ودمج سجل قديم<input type="file" accept=".json" onchange="importUserData(event)"></label>
+            <button class="settings-btn" style="background: var(--danger); width: 100%; margin-top: 15px; margin-bottom: 20px;" onclick="resetData()">⚠️ تصفير كافة البيانات للحساب</button>
         </div>
     </div>
 
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js').catch(err => console.error('SW Error', err));
-        }
+    <!-- كود فايربيس المدمج مع المصادقة (Auth) - التعديل تم هنا -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        
+        // تم التعديل من signInWithPopup إلى signInWithRedirect
+        import { getAuth, signInWithRedirect, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-        // تم استبدال الثابت بمتغير ديناميكي يُحفظ في المتصفح
+        const firebaseConfig = {
+            apiKey: "AIzaSyDKiUhLEJxmamEtimAMCQZG8edlg_8QZyA",
+            authDomain: "prayer-tracker-feee2.firebaseapp.com",
+            projectId: "prayer-tracker-feee2",
+            storageBucket: "prayer-tracker-feee2.firebasestorage.app",
+            messagingSenderId: "613506250790",
+            appId: "1:613506250790:web:c839b1e0ee2e090d5ecee7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        let currentUser = null;
         let appStartDate = localStorage.getItem('appStartDate') || '2026-06-21'; 
-
         let currentViewMonth = new Date().getMonth() + 1;
         let currentViewYear = new Date().getFullYear();
         const monthNamesEn = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-        let appData = JSON.parse(localStorage.getItem('prayerData_v1')) || {};
+        let appData = {}; 
         let customTimings = JSON.parse(localStorage.getItem('baalbekTimings')) || {};
         
-        let currentChartInstance = null;
-        let legacyChartInstance = null;
+        let currentChartInstance = null; let legacyChartInstance = null;
 
         const prayerNames = [
-            { id: 'fajr', name: 'الصبح', type: 'fard' },
-            { id: 'dhuhr', name: 'الظهر', type: 'fard' },
-            { id: 'asr', name: 'العصر', type: 'fard' },
-            { id: 'maghrib', name: 'المغرب', type: 'fard' },
-            { id: 'ghufaila', name: 'صلاة الغفيلة', type: 'nafl' },
-            { id: 'isha', name: 'العشاء', type: 'fard' },
+            { id: 'fajr', name: 'الصبح', type: 'fard' }, { id: 'dhuhr', name: 'الظهر', type: 'fard' },
+            { id: 'asr', name: 'العصر', type: 'fard' }, { id: 'maghrib', name: 'المغرب', type: 'fard' },
+            { id: 'ghufaila', name: 'صلاة الغفيلة', type: 'nafl' }, { id: 'isha', name: 'العشاء', type: 'fard' },
             { id: 'night', name: 'صلاة الليل', type: 'nafl' }
         ];
+
+        // مراقبة حالة تسجيل الدخول
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // المستخدم مسجل دخول
+                currentUser = user;
+                document.getElementById('login-overlay').style.display = 'none';
+                document.getElementById('loading-overlay').style.display = 'flex';
+                document.getElementById('user-email-display').innerText = `مسجل الدخول كـ: ${user.email}`;
+                await loadData();
+            } else {
+                // المستخدم غير مسجل دخول
+                currentUser = null;
+                appData = {};
+                document.getElementById('login-overlay').style.display = 'flex';
+                document.getElementById('loading-overlay').style.display = 'none';
+            }
+        });
+
+        // التعديل تم هنا (تغيير دالة الدخول)
+        window.loginWithGoogle = () => {
+            signInWithRedirect(auth, provider).catch((error) => {
+                alert("فشل تسجيل الدخول: " + error.message);
+            });
+        };
+
+        window.logout = () => {
+            signOut(auth).catch((error) => {
+                alert("حدث خطأ أثناء تسجيل الخروج");
+            });
+        };
 
         function timeToMinutes(timeStr) {
             if (!timeStr) return 0;
@@ -209,40 +241,65 @@
             return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
         }
 
-        function saveStartDate() {
-            const dateVal = document.getElementById('app-start-date').value;
-            if (dateVal) {
-                appStartDate = dateVal;
-                localStorage.setItem('appStartDate', appStartDate);
-                generateStats(); 
-                alert('تم حفظ تاريخ البدء بنجاح! سيتم تحديث الإحصائيات.');
+        async function loadData() {
+            if (!currentUser) return;
+            try {
+                // جلب بيانات المستخدم المحددة بواسطة الـ UID الخاص به
+                const docRef = doc(db, "Users", currentUser.uid);
+                const docSnap = await getDoc(docRef);
+                
+                if (docSnap.exists()) {
+                    appData = docSnap.data().records || {};
+                } else {
+                    // إذا كان حساب جديد، نرفع البيانات المحلية إن وجدت لتسهيل الانتقال
+                    let localData = JSON.parse(localStorage.getItem('prayerData_v1'));
+                    if (localData && Object.keys(localData).length > 0) {
+                        appData = localData;
+                        await saveToCloud();
+                        localStorage.removeItem('prayerData_v1'); // مسحها من المحلي بعد الرفع
+                    }
+                }
+            } catch (error) {
+                console.error("خطأ في الاتصال بالسحابة:", error);
+                alert("حدث خطأ في تحميل بياناتك من السحابة.");
+            }
+            document.getElementById('loading-overlay').style.display = 'none';
+            renderCalendar();
+        }
+
+        async function saveToCloud() {
+            if (!currentUser) return;
+            try {
+                // حفظ البيانات في مستند خاص بالمستخدم بناءً على رقم حسابه
+                await setDoc(doc(db, "Users", currentUser.uid), { records: appData }, { merge: true });
+            } catch (error) {
+                console.error("خطأ في الحفظ السحابي:", error);
             }
         }
 
-        function importJSON(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+        window.saveStartDate = function() {
+            const dateVal = document.getElementById('app-start-date').value;
+            if (dateVal) { appStartDate = dateVal; localStorage.setItem('appStartDate', appStartDate); generateStats(); alert('تم الحفظ!'); }
+        }
+
+        window.importJSON = function(event) {
+            const file = event.target.files[0]; if (!file) return;
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
                     const json = JSON.parse(e.target.result);
                     customTimings = { ...customTimings, ...json };
                     localStorage.setItem('baalbekTimings', JSON.stringify(customTimings));
-                    alert("تم استيراد ودمج المواقيت الجديدة بنجاح! لن تتأثر الأشهر القديمة.");
-                } catch (err) { alert("حدث خطأ في ملف JSON الخاص بالمواقيت."); }
-            };
-            reader.readAsText(file);
-            event.target.value = ''; 
+                    alert("تم الاستيراد بنجاح!");
+                } catch (err) { alert("خطأ في الملف"); }
+            }; reader.readAsText(file); event.target.value = ''; 
         }
 
         function renderCalendar() {
             document.getElementById('current-month-display').innerText = `${monthNamesEn[currentViewMonth - 1]} ${currentViewYear}`;
-            const grid = document.getElementById('calendar-grid');
-            grid.innerHTML = '';
+            const grid = document.getElementById('calendar-grid'); grid.innerHTML = '';
             const firstDayIndex = new Date(currentViewYear, currentViewMonth - 1, 1).getDay();
-            for (let j = 0; j < firstDayIndex; j++) {
-                const emptyCard = document.createElement('div'); emptyCard.className = 'empty-day'; grid.appendChild(emptyCard);
-            }
+            for (let j = 0; j < firstDayIndex; j++) { const emptyCard = document.createElement('div'); emptyCard.className = 'empty-day'; grid.appendChild(emptyCard); }
             const daysInMonth = new Date(currentViewYear, currentViewMonth, 0).getDate();
             const todayStr = formatDate(new Date());
 
@@ -251,162 +308,104 @@
                 const card = document.createElement('div'); card.className = 'day-card';
                 if (dayStr === todayStr) card.classList.add('today');
                 card.innerHTML = `<h3>${i}</h3>`;
-                card.onclick = () => openDay(dayStr);
+                card.onclick = () => window.openDay(dayStr);
                 grid.appendChild(card);
             }
         }
 
         function getPrayerEndMin(pId, dayTimings) {
-            if (!dayTimings) return 1440; // نهاية اليوم الافتراضية
+            if (!dayTimings) return 1440; 
             if (pId === 'fajr') return dayTimings['sunrise'] ? timeToMinutes(dayTimings['sunrise']) : (dayTimings['dhuhr'] ? timeToMinutes(dayTimings['dhuhr']) : 1440);
             if (pId === 'dhuhr' || pId === 'asr') return dayTimings['maghrib'] ? timeToMinutes(dayTimings['maghrib']) : 1440;
-            return 1440; // المغرب والعشاء لا يعتبران فائتين حتى نهاية اليوم بالكامل
+            return 1440; 
         }
 
-        function openDay(dateStr) {
+        window.openDay = function(dateStr) {
             const list = document.getElementById('prayers-list');
             document.getElementById('modal-date-title').innerText = `صلوات يوم: ${dateStr}`;
             list.innerHTML = '';
-
-            const todayObj = new Date();
-            const todayStr = formatDate(todayObj);
-            const nowMin = todayObj.getHours() * 60 + todayObj.getMinutes();
+            const todayObj = new Date(); const todayStr = formatDate(todayObj); const nowMin = todayObj.getHours() * 60 + todayObj.getMinutes();
             const dayTimings = customTimings[dateStr] || null;
-
-            const isFutureDay = dateStr > todayStr;
-            const isToday = dateStr === todayStr;
-            const isFarPast = dateStr < appStartDate; // تم استخدام تاريخ البدء الديناميكي
+            const isFutureDay = dateStr > todayStr; const isToday = dateStr === todayStr; const isFarPast = dateStr < appStartDate;
 
             if (!appData[dateStr]) appData[dateStr] = {};
 
             prayerNames.forEach(p => {
                 const savedState = appData[dateStr][p.id]; 
-                
-                // إخفاء النوافل للأيام التي تسبق تاريخ البدء
                 if (isFarPast && p.type === 'nafl') return;
                 if (dateStr < todayStr && p.type === 'nafl' && !savedState) return;
 
                 const div = document.createElement('div'); div.className = 'prayer-item';
-                
-                let displayKey = p.id;
-                if (p.id === 'ghufaila') displayKey = 'maghrib';
-                if (p.id === 'night') displayKey = 'isha';
+                let displayKey = p.id; if (p.id === 'ghufaila') displayKey = 'maghrib'; if (p.id === 'night') displayKey = 'isha';
+                let logicKey = p.id; if (p.id === 'asr') logicKey = 'dhuhr'; if (p.id === 'isha' || p.id === 'ghufaila' || p.id === 'night') logicKey = 'maghrib'; 
 
-                let logicKey = p.id;
-                if (p.id === 'asr') logicKey = 'dhuhr'; 
-                if (p.id === 'isha' || p.id === 'ghufaila' || p.id === 'night') logicKey = 'maghrib'; 
-
-                let timeDisplay = '';
-                let startMin = -1; let endMin = -1;
-
+                let timeDisplay = ''; let startMin = -1; let endMin = -1;
                 if (dayTimings) {
-                    if (dayTimings[displayKey]) {
-                        timeDisplay = `<div class="prayer-time">⌚ ${dayTimings[displayKey]}</div>`;
-                    }
-                    if (dayTimings[logicKey]) {
-                        startMin = timeToMinutes(dayTimings[logicKey]);
-                    }
+                    if (dayTimings[displayKey]) timeDisplay = `<div class="prayer-time">⌚ ${dayTimings[displayKey]}</div>`;
+                    if (dayTimings[logicKey]) startMin = timeToMinutes(dayTimings[logicKey]);
                     endMin = getPrayerEndMin(p.id, dayTimings);
                 }
 
                 let btnClass = 'action-btn'; let btnText = ''; let clickAction = ''; let disabled = false;
-
                 if (savedState) {
                     if (savedState === 'adaa') { btnClass += ' completed-adaa'; btnText = 'تمت أداءً ✔'; }
                     else if (savedState === 'qadaa') { btnClass += ' completed-qadaa'; btnText = 'تم القضاء ✔'; }
                     else { btnClass += ' legacy-completed'; btnText = 'تمت ✔'; } 
-                    clickAction = `removePrayer('${dateStr}', '${p.id}')`;
+                    clickAction = `window.removePrayer('${dateStr}', '${p.id}')`;
                 } else {
-                    if (isFutureDay) {
-                        disabled = true; btnClass += ' future'; btnText = 'لم يحن وقتها';
-                    } else if (isToday) {
-                        if (startMin !== -1 && nowMin < startMin) {
-                            disabled = true; btnClass += ' future'; btnText = 'لم يحن وقتها';
-                        } else if (startMin !== -1 && nowMin <= endMin) {
-                            btnClass += ' adaa'; btnText = 'تسجيل أداء'; 
-                            clickAction = `togglePrayer('${dateStr}', '${p.id}', 'adaa')`;
-                        } else {
-                            btnClass += ' qadaa'; btnText = 'يجب قضاؤها'; 
-                            clickAction = `togglePrayer('${dateStr}', '${p.id}', 'qadaa')`;
-                        }
-                    } else {
-                        btnClass += ' qadaa'; btnText = 'يجب قضاؤها'; 
-                        clickAction = `togglePrayer('${dateStr}', '${p.id}', 'qadaa')`;
-                    }
+                    if (isFutureDay) { disabled = true; btnClass += ' future'; btnText = 'لم يحن'; } 
+                    else if (isToday) {
+                        if (startMin !== -1 && nowMin < startMin) { disabled = true; btnClass += ' future'; btnText = 'لم يحن'; } 
+                        else if (startMin !== -1 && nowMin <= endMin) { btnClass += ' adaa'; btnText = 'أداء'; clickAction = `window.togglePrayer('${dateStr}', '${p.id}', 'adaa')`; } 
+                        else { btnClass += ' qadaa'; btnText = 'قضاء'; clickAction = `window.togglePrayer('${dateStr}', '${p.id}', 'qadaa')`; }
+                    } else { btnClass += ' qadaa'; btnText = 'قضاء'; clickAction = `window.togglePrayer('${dateStr}', '${p.id}', 'qadaa')`; }
                 }
 
-                div.innerHTML = `
-                    <div class="prayer-info"><h3>${p.name}</h3>${timeDisplay}</div>
-                    <button class="${btnClass}" ${disabled ? 'disabled' : `onclick="${clickAction}"`}>${btnText}</button>
-                `;
+                div.innerHTML = `<div class="prayer-info"><h3>${p.name}</h3>${timeDisplay}</div><button class="${btnClass}" ${disabled ? 'disabled' : `onclick="${clickAction}"`}>${btnText}</button>`;
                 list.appendChild(div);
             });
             document.getElementById('day-modal').style.display = 'flex';
         }
 
-        function togglePrayer(dateStr, prayerId, type) {
-            let msg = type === 'adaa' ? "هل أتممت هذه الصلاة في وقتها (أداء)؟" : "هل أتممت قضاء هذه الصلاة للتو؟";
-            if (confirm(msg)) {
-                appData[dateStr][prayerId] = type;
-                saveData(); openDay(dateStr);
-            }
+        window.togglePrayer = async function(dateStr, prayerId, type) {
+            appData[dateStr][prayerId] = type;
+            window.openDay(dateStr); 
+            await saveToCloud(); 
         }
 
-        function removePrayer(dateStr, prayerId) {
-            if (confirm("هل تريد التراجع وإلغاء تسجيل هذه الصلاة لتعود كأنها لم تُصلَّ؟")) {
+        window.removePrayer = async function(dateStr, prayerId) {
+            if (confirm("هل تريد التراجع وإلغاء تسجيل هذه الصلاة؟")) {
                 delete appData[dateStr][prayerId];
-                saveData(); openDay(dateStr);
+                window.openDay(dateStr);
+                await saveToCloud();
             }
         }
 
-        // دالة مساعدة لتحديد ما إذا كانت الصلاة فائتة فعلاً أم لم يحن وقتها / قيد الانتظار لليوم الحالي
         function isPrayerMissed(dateStr, pId, todayStr, nowMin) {
-            if (dateStr > todayStr) return false;
-            if (dateStr < todayStr) return true; 
-            
-            // إذا كان اليوم هو نفس تاريخ اليوم، نتحقق من الوقت
-            const dayTimings = customTimings[dateStr] || null;
-            if (!dayTimings) return false; // إذا لم تكن هناك مواقيت دقيقة، لا نعتبرها فائتة حتى ينتهي اليوم
-
-            const endMin = getPrayerEndMin(pId, dayTimings);
-            return nowMin > endMin;
+            if (dateStr > todayStr) return false; if (dateStr < todayStr) return true; 
+            const dayTimings = customTimings[dateStr] || null; if (!dayTimings) return false; 
+            return nowMin > getPrayerEndMin(pId, dayTimings);
         }
 
         function generateStats() {
             document.getElementById('stats-month-name').innerText = monthNamesEn[currentViewMonth - 1];
             document.getElementById('app-start-date').value = appStartDate;
-            
-            const fardPrayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
-            const labels = ['الصبح', 'الظهر', 'العصر', 'المغرب', 'العشاء'];
-            
-            // بيانات ما بعد تاريخ البدء (التتبع الحالي)
-            const adaaData = [0, 0, 0, 0, 0];
-            const currentQadaaData = [0, 0, 0, 0, 0];
-            const missedData = [0, 0, 0, 0, 0];
-
-            // بيانات ما قبل تاريخ البدء (القضاء القديم)
+            const fardPrayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']; const labels = ['الصبح', 'الظهر', 'العصر', 'المغرب', 'العشاء'];
+            const adaaData = [0, 0, 0, 0, 0]; const currentQadaaData = [0, 0, 0, 0, 0]; const missedData = [0, 0, 0, 0, 0];
             const legacyQadaaData = [0, 0, 0, 0, 0];
-
-            const todayObj = new Date();
-            const todayStr = formatDate(todayObj);
-            const nowMin = todayObj.getHours() * 60 + todayObj.getMinutes();
+            const todayObj = new Date(); const todayStr = formatDate(todayObj); const nowMin = todayObj.getHours() * 60 + todayObj.getMinutes();
             const daysInMonth = new Date(currentViewYear, currentViewMonth, 0).getDate();
-
-            let hasCurrentData = false;
-            let hasLegacyData = false;
+            let hasCurrentData = false; let hasLegacyData = false;
 
             for(let i = 1; i <= daysInMonth; i++) {
                 const dStr = `${currentViewYear}-${String(currentViewMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-                
                 if (dStr >= appStartDate) {
                     if (dStr <= todayStr) {
                         hasCurrentData = true;
                         fardPrayers.forEach((pId, idx) => {
                             let state = appData[dStr] ? appData[dStr][pId] : null;
-                            if(state === 'adaa') adaaData[idx]++;
-                            else if(state === 'qadaa') currentQadaaData[idx]++;
-                            else if(state) adaaData[idx]++; 
-                            else if(isPrayerMissed(dStr, pId, todayStr, nowMin)) missedData[idx]++;
+                            if(state === 'adaa') adaaData[idx]++; else if(state === 'qadaa') currentQadaaData[idx]++;
+                            else if(state) adaaData[idx]++; else if(isPrayerMissed(dStr, pId, todayStr, nowMin)) missedData[idx]++;
                         });
                     }
                 } else {
@@ -418,186 +417,110 @@
                 }
             }
 
-            // رسم بياني 1: التتبع الحالي
             if(currentChartInstance) currentChartInstance.destroy();
             const wrapperCurrent = document.getElementById('current-chart-wrapper');
             if (hasCurrentData) {
                 wrapperCurrent.style.display = 'block';
-                const ctxCurrent = document.getElementById('currentChart').getContext('2d');
-                currentChartInstance = new Chart(ctxCurrent, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [
-                            { label: 'في وقتها (أداء)', data: adaaData, backgroundColor: '#27ae60' },
-                            { label: 'تم قضاؤها', data: currentQadaaData, backgroundColor: '#e67e22' },
-                            { label: 'فائتة (لم تُصلَّ)', data: missedData, backgroundColor: '#c0392b' }
-                        ]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+                currentChartInstance = new Chart(document.getElementById('currentChart').getContext('2d'), {
+                    type: 'bar', data: { labels: labels, datasets: [
+                        { label: 'أداء', data: adaaData, backgroundColor: '#27ae60' },
+                        { label: 'قضاء', data: currentQadaaData, backgroundColor: '#e67e22' },
+                        { label: 'فائتة', data: missedData, backgroundColor: '#c0392b' }
+                    ]}, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
                 });
-            } else {
-                wrapperCurrent.style.display = 'none';
-            }
+            } else { wrapperCurrent.style.display = 'none'; }
 
-            // رسم بياني 2: القضاء المتراكم القديم
             if(legacyChartInstance) legacyChartInstance.destroy();
             const wrapperLegacy = document.getElementById('legacy-chart-wrapper');
             if (hasLegacyData) {
                 wrapperLegacy.style.display = 'block';
-                const ctxLegacy = document.getElementById('legacyChart').getContext('2d');
-                legacyChartInstance = new Chart(ctxLegacy, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [
-                            { label: 'قضاء لأيام قديمة (إنجاز متراكم)', data: legacyQadaaData, backgroundColor: '#8e44ad' }
-                        ]
-                    },
+                legacyChartInstance = new Chart(document.getElementById('legacyChart').getContext('2d'), {
+                    type: 'bar', data: { labels: labels, datasets: [{ label: 'قضاء لأيام قديمة', data: legacyQadaaData, backgroundColor: '#8e44ad' }] },
                     options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
                 });
-            } else {
-                wrapperLegacy.style.display = 'none';
-            }
+            } else { wrapperLegacy.style.display = 'none'; }
         }
 
-        function changeMonth(step) {
+        window.changeMonth = function(step) {
             currentViewMonth += step;
             if (currentViewMonth > 12) { currentViewMonth = 1; currentViewYear++; }
             if (currentViewMonth < 1) { currentViewMonth = 12; currentViewYear--; }
             renderCalendar();
         }
 
-        function formatDate(date) {
-            const y = date.getFullYear(); const m = String(date.getMonth() + 1).padStart(2, '0'); const d = String(date.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
-        }
+        function formatDate(date) { const y = date.getFullYear(); const m = String(date.getMonth() + 1).padStart(2, '0'); const d = String(date.getDate()).padStart(2, '0'); return `${y}-${m}-${d}`; }
 
-        function saveData() { localStorage.setItem('prayerData_v1', JSON.stringify(appData)); }
-        
-        function resetData() {
-            if(confirm("تحذير خطير: هل تريد حقاً مسح كل سجلاتك السابقة من الجهاز وتصفير التطبيق؟")) {
-                localStorage.removeItem('prayerData_v1'); appData = {}; renderCalendar(); closeModal('settings-modal');
+        window.resetData = async function() {
+            if(confirm("تحذير خطير: هل تريد مسح بيانات حسابك نهائياً من السحابة؟")) {
+                appData = {};
+                await saveToCloud();
+                renderCalendar(); window.closeModal('settings-modal'); alert("تم مسح بيانات حسابك.");
             }
         }
 
-        function openSettings() { 
-            document.getElementById('settings-modal').style.display = 'flex'; 
-            generateStats(); 
-            document.getElementById('bulk-year').value = currentViewYear;
-            document.getElementById('bulk-month').value = currentViewMonth;
+        window.openSettings = function() { 
+            document.getElementById('settings-modal').style.display = 'flex'; generateStats(); 
+            document.getElementById('bulk-year').value = currentViewYear; document.getElementById('bulk-month').value = currentViewMonth;
         }
 
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; }
         
-        function applyBulkQadaa() {
-            const startYear = parseInt(document.getElementById('bulk-year').value);
-            const startMonth = parseInt(document.getElementById('bulk-month').value);
-            const prayerId = document.getElementById('bulk-prayer').value;
-            const countInput = document.getElementById('bulk-count');
+        window.applyBulkQadaa = async function() {
+            const startYear = parseInt(document.getElementById('bulk-year').value); const startMonth = parseInt(document.getElementById('bulk-month').value);
+            const prayerId = document.getElementById('bulk-prayer').value; const countInput = document.getElementById('bulk-count');
             let remainingCount = parseInt(countInput.value);
 
-            if (!startYear || !startMonth || !prayerId || isNaN(remainingCount) || remainingCount <= 0) {
-                alert("الرجاء إدخال جميع البيانات وعدد الأيام بشكل صحيح.");
-                return;
-            }
+            if (!startYear || !startMonth || !prayerId || isNaN(remainingCount) || remainingCount <= 0) { alert("بيانات غير صحيحة."); return; }
 
-            const todayStr = formatDate(new Date()); 
-            let filledCount = 0;
-            let currentYear = startYear;
-            let currentMonth = startMonth;
-            let maxMonthsToSearch = 120; 
-            let distributionReport = {};
+            const todayStr = formatDate(new Date()); let filledCount = 0; let currentYear = startYear; let currentMonth = startMonth; let maxMonthsToSearch = 120; 
+            
+            document.getElementById('loading-overlay').style.display = 'flex';
 
             while (remainingCount > 0 && maxMonthsToSearch > 0) {
-                maxMonthsToSearch--;
-                const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
-
+                maxMonthsToSearch--; const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
                 for (let i = daysInMonth; i >= 1; i--) {
                     if (remainingCount === 0) break; 
                     const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-                    
                     if (dateStr >= todayStr) continue;
-
                     if (!appData[dateStr]) appData[dateStr] = {};
-                    
-                    if (!appData[dateStr][prayerId]) {
-                        appData[dateStr][prayerId] = 'qadaa';
-                        remainingCount--;
-                        filledCount++;
-                        const monthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
-                        distributionReport[monthKey] = (distributionReport[monthKey] || 0) + 1;
-                    }
+                    if (!appData[dateStr][prayerId]) { appData[dateStr][prayerId] = 'qadaa'; remainingCount--; filledCount++; }
                 }
-
-                if (remainingCount > 0) {
-                    currentMonth--;
-                    if (currentMonth === 0) { currentMonth = 12; currentYear--; }
-                }
+                if (remainingCount > 0) { currentMonth--; if (currentMonth === 0) { currentMonth = 12; currentYear--; } }
             }
 
-            saveData();
-            renderCalendar();
-            generateStats(); 
-            
-            let alertMessage = `✅ تم تسجيل ${filledCount} صلاة قضاء بنجاح!\n\n📋 التوزيع:\n`;
-            for (const key in distributionReport) {
-                const [y, m] = key.split('-');
-                alertMessage += `• شهر ${parseInt(m)} / ${y}: ${distributionReport[key]} يوم.\n`;
-            }
-            alert(alertMessage);
-            countInput.value = ''; 
+            await saveToCloud();
+            document.getElementById('loading-overlay').style.display = 'none';
+            renderCalendar(); generateStats(); 
+            alert(`✅ تم تسجيل ${filledCount} صلاة قضاء وحفظها سحابياً لحسابك!`); countInput.value = ''; 
         }
 
-        function downloadJSON(data, filename) {
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+        window.exportUserData = function() {
+            if (Object.keys(appData).length === 0) { alert("لا توجد بيانات لتصديرها."); return; }
+            const blob = new Blob([JSON.stringify(appData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `MyPrayers_Backup_${formatDate(new Date())}.json`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
         }
 
-        function exportUserData() {
-            if (Object.keys(appData).length === 0) {
-                alert("سجل صلواتك فارغ حالياً، لا توجد بيانات لتصديرها.");
-                return;
-            }
-            const today = formatDate(new Date());
-            downloadJSON(appData, `MyPrayers_Backup_${today}.json`);
-        }
-
-        function importUserData(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+        window.importUserData = async function(event) {
+            const file = event.target.files[0]; if (!file) return;
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 try {
                     const json = JSON.parse(e.target.result);
                     if (typeof json === 'object' && json !== null) {
                         for (let dateKey in json) {
                             if (!appData[dateKey]) appData[dateKey] = {};
-                            for (let prayerKey in json[dateKey]) {
-                                appData[dateKey][prayerKey] = json[dateKey][prayerKey];
-                            }
+                            for (let prayerKey in json[dateKey]) { appData[dateKey][prayerKey] = json[dateKey][prayerKey]; }
                         }
-                        saveData();
-                        renderCalendar();
-                        generateStats(); 
-                        alert("تم دمج سجل صلواتك الشخصي بنجاح وتحديث التقويم!");
-                    } else {
-                        alert("صيغة الملف غير صحيحة.");
+                        document.getElementById('loading-overlay').style.display = 'flex';
+                        await saveToCloud();
+                        document.getElementById('loading-overlay').style.display = 'none';
+                        renderCalendar(); generateStats(); alert("تم دمج السجل القديم ورفعه للسحابة لحسابك بنجاح!");
                     }
-                } catch (err) { alert("حدث خطأ أثناء قراءة ملف السجلات الشخصية."); }
-            };
-            reader.readAsText(file);
-            event.target.value = ''; 
+                } catch (err) { alert("خطأ في الملف"); document.getElementById('loading-overlay').style.display = 'none';}
+            }; reader.readAsText(file); event.target.value = ''; 
         }
 
-        window.onload = () => { renderCalendar(); };
     </script>
 </body>
 </html>
