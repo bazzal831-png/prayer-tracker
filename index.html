@@ -65,6 +65,8 @@
         
         .google-btn { background-color: #4285F4; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 1.2rem; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .google-btn:hover { background-color: #357ae8; }
+        
+        .offline-badge { display: none; background-color: var(--warning); color: white; padding: 5px 10px; border-radius: 5px; font-size: 0.8rem; font-weight: bold; margin-left: 10px; }
     </style>
 </head>
 <body>
@@ -78,11 +80,14 @@
 
     <div id="loading-overlay" style="display: none;">
         <div class="loader"></div>
-        <h3 style="margin-top:20px; color:var(--primary);">جاري المزامنة...</h3>
+        <h3 style="margin-top:20px; color:var(--primary);">جاري تحميل التطبيق...</h3>
     </div>
 
     <header>
-        <h1>مراقب الصلوات ☁️</h1>
+        <div style="display: flex; align-items: center;">
+            <h1>مراقب الصلوات ☁️</h1>
+            <span id="offline-indicator" class="offline-badge">بدون إنترنت</span>
+        </div>
         <div>
             <button class="settings-btn logout-btn" onclick="logout()">خروج</button>
             <button class="settings-btn" onclick="openSettings()">الإعدادات</button>
@@ -155,7 +160,8 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        // التعديل هنا: استيراد أدوات التخزين المحلي والعمل دون إنترنت
+        import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = {
@@ -168,7 +174,12 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+        
+        // التعديل هنا: تفعيل المزامنة المحلية وقاعدة البيانات التي تعمل بدون إنترنت
+        const db = initializeFirestore(app, {
+            localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
+        });
+        
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
 
@@ -189,6 +200,19 @@
             { id: 'ghufaila', name: 'صلاة الغفيلة', type: 'nafl' }, { id: 'isha', name: 'العشاء', type: 'fard' },
             { id: 'night', name: 'صلاة الليل', type: 'nafl' }
         ];
+
+        // التحقق من حالة الإنترنت وعرض مؤشر إذا كان المستخدم غير متصل
+        function updateOnlineStatus() {
+            const indicator = document.getElementById('offline-indicator');
+            if (navigator.onLine) {
+                indicator.style.display = 'none';
+            } else {
+                indicator.style.display = 'inline-block';
+            }
+        }
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        updateOnlineStatus();
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -227,6 +251,11 @@
         async function fetchAndCacheTimings(year, month) {
             const cacheKey = `${parseInt(year)}-${parseInt(month)}`;
             if (!cachedTimings[cacheKey]) {
+                if (!navigator.onLine) {
+                    console.log("أنت غير متصل بالإنترنت، سيتم عرض الأيام بدون مواقيت حتى يتوفر الاتصال.");
+                    return; // لا نحاول جلب البيانات إذا لم يكن هناك إنترنت لتجنب التعليق
+                }
+                
                 document.getElementById('loading-overlay').style.display = 'flex';
                 try {
                     const response = await fetch(`https://api.aladhan.com/v1/calendarByCity/${year}/${month}?city=Baalbek&country=Lebanon&method=0`);
@@ -262,6 +291,8 @@
             if (!currentUser) return;
             try {
                 const docRef = doc(db, "Users", currentUser.uid);
+                
+                // بفضل تفعيل الأوفلاين، هذا الأمر سيقرأ من جهازك فورا إذا لم يكن هناك إنترنت!
                 const docSnap = await getDoc(docRef);
                 
                 if (docSnap.exists()) {
@@ -271,20 +302,19 @@
                 await fetchAndCacheTimings(currentViewYear, currentViewMonth);
                 
             } catch (error) {
-                console.error("خطأ في الاتصال بالسحابة:", error);
-                alert("حدث خطأ في تحميل بياناتك من السحابة.");
+                console.error("خطأ في قراءة البيانات:", error);
             }
             document.getElementById('loading-overlay').style.display = 'none';
             renderCalendar();
         }
 
-        async function saveToCloud() {
+        // التعديل هنا: إزالة await لكي يعمل التطبيق كـ"الواتساب" (يسجل فورا ويرسل للسحابة بالخلفية)
+        function saveToCloud() {
             if (!currentUser) return;
-            try {
-                await setDoc(doc(db, "Users", currentUser.uid), { records: appData }, { merge: true });
-            } catch (error) {
-                console.error("خطأ في الحفظ السحابي:", error);
-            }
+            // يتم الحفظ محلياً فوراً، وستقوم Firebase بجدولة الإرسال للسحابة متى توفر الإنترنت
+            setDoc(doc(db, "Users", currentUser.uid), { records: appData }, { merge: true })
+                .then(() => console.log("تمت المزامنة بنجاح في الخلفية"))
+                .catch(err => console.error("خطأ في المزامنة:", err));
         }
 
         window.saveStartDate = function() {
@@ -368,17 +398,19 @@
             document.getElementById('day-modal').style.display = 'flex';
         }
 
-        window.togglePrayer = async function(dateStr, prayerId, type) {
+        // التعديل هنا: إزالة await لكي تستجيب الأزرار فوراً حتى بدون إنترنت
+        window.togglePrayer = function(dateStr, prayerId, type) {
             appData[dateStr][prayerId] = type;
             window.openDay(dateStr); 
-            await saveToCloud(); 
+            saveToCloud(); 
         }
 
-        window.removePrayer = async function(dateStr, prayerId) {
+        // التعديل هنا أيضاً
+        window.removePrayer = function(dateStr, prayerId) {
             if (confirm("هل تريد التراجع وإلغاء تسجيل هذه الصلاة؟")) {
                 delete appData[dateStr][prayerId];
                 window.openDay(dateStr);
-                await saveToCloud();
+                saveToCloud();
             }
         }
 
@@ -451,7 +483,9 @@
             currentViewMonth += step;
             if (currentViewMonth > 12) { currentViewMonth = 1; currentViewYear++; }
             if (currentViewMonth < 1) { currentViewMonth = 12; currentViewYear--; }
-            document.getElementById('loading-overlay').style.display = 'flex';
+            
+            // تم التعديل لعدم حجب الشاشة طويلاً إذا لم يكن هناك إنترنت
+            if(navigator.onLine) document.getElementById('loading-overlay').style.display = 'flex';
             await fetchAndCacheTimings(currentViewYear, currentViewMonth);
             document.getElementById('loading-overlay').style.display = 'none';
             renderCalendar();
@@ -459,10 +493,10 @@
 
         function formatDate(date) { const y = date.getFullYear(); const m = String(date.getMonth() + 1).padStart(2, '0'); const d = String(date.getDate()).padStart(2, '0'); return `${y}-${m}-${d}`; }
 
-        window.resetData = async function() {
+        window.resetData = function() {
             if(confirm("تحذير خطير: هل تريد مسح بيانات حسابك نهائياً من السحابة؟")) {
                 appData = {};
-                await saveToCloud();
+                saveToCloud(); // بدون انتظار
                 renderCalendar(); window.closeModal('settings-modal'); alert("تم مسح بيانات حسابك.");
             }
         }
@@ -474,7 +508,7 @@
 
         window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; }
         
-        window.applyBulkQadaa = async function() {
+        window.applyBulkQadaa = function() {
             const startYear = parseInt(document.getElementById('bulk-year').value); const startMonth = parseInt(document.getElementById('bulk-month').value);
             const prayerId = document.getElementById('bulk-prayer').value; const countInput = document.getElementById('bulk-count');
             let remainingCount = parseInt(countInput.value);
@@ -483,8 +517,6 @@
 
             const todayStr = formatDate(new Date()); let filledCount = 0; let currentYear = startYear; let currentMonth = startMonth; let maxMonthsToSearch = 120; 
             
-            document.getElementById('loading-overlay').style.display = 'flex';
-
             while (remainingCount > 0 && maxMonthsToSearch > 0) {
                 maxMonthsToSearch--; const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
                 for (let i = daysInMonth; i >= 1; i--) {
@@ -497,10 +529,10 @@
                 if (remainingCount > 0) { currentMonth--; if (currentMonth === 0) { currentMonth = 12; currentYear--; } }
             }
 
-            await saveToCloud();
-            document.getElementById('loading-overlay').style.display = 'none';
+            // إزالة await لكي يسجل فوراً
+            saveToCloud();
             renderCalendar(); generateStats(); 
-            alert(`✅ تم تسجيل ${filledCount} صلاة قضاء وحفظها سحابياً لحسابك!`); countInput.value = ''; 
+            alert(`✅ تم تسجيل ${filledCount} صلاة قضاء، سيتم مزامنتها سحابياً!`); countInput.value = ''; 
         }
 
     </script>
