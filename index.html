@@ -210,7 +210,6 @@
             { id: 'night', name: 'صلاة الليل', type: 'nafl' }
         ];
 
-        // مصفوفة التسبيحات والأذكار الثابتة بناءً على أيام الأسبوع
         window.dailyDhikr = {
             0: [ { id: 'dhikr_sun_1', name: '📿 يا فتاح (489)' }, { id: 'dhikr_sun_2', name: '📿 يا ذا الجلال والإكرام (100)' } ], // الأحد
             1: [ { id: 'dhikr_mon_1', name: '📿 يا لطيف (129)' }, { id: 'dhikr_mon_2', name: '📿 يا قاضي الحاجات (100)' } ], // الاثنين
@@ -304,9 +303,15 @@
             renderCalendar();
         }
 
+        // ==========================================
+        // التعديل هنا: إزالة { merge: true }
+        // لكي تتم الكتابة فوق البيانات القديمة 
+        // وتُحذف العناصر التي قمت بمسحها بشكل فعلي
+        // ==========================================
         function saveToCloud() {
             if (!currentUser) return;
-            setDoc(doc(db, "Users", currentUser.uid), { records: appData }, { merge: true }).catch(err => console.error("خطأ:", err));
+            // استبدال كامل للبيانات بدون خاصية الدمج
+            setDoc(doc(db, "Users", currentUser.uid), { records: appData }).catch(err => console.error("خطأ:", err));
         }
 
         window.saveStartDate = function() {
@@ -380,25 +385,20 @@
             const isFutureDay = dateStr > todayStr; const isToday = dateStr === todayStr; const isFarPast = dateStr < appStartDate;
             if (!appData[dateStr]) appData[dateStr] = {};
 
-            // دمج الصلوات مع الأدعية والتسبيحات
             let dayTasks = [...prayerNames];
             
-            // إضافة المستحبات اليومية (دعاء الصباح وزيارة عاشوراء)
             dayTasks.push({ id: 'dua_sabah', name: 'دعاء الصباح', type: 'dua' });
             dayTasks.push({ id: 'ziyarat_ashura', name: 'زيارة عاشوراء', type: 'dua' });
 
-            // إضافة المستحبات المخصصة لأيام محددة
             if (dayOfWeek === 2) dayTasks.push({ id: 'tawassul', name: 'دعاء التوسل', type: 'dua' });
             if (dayOfWeek === 4) dayTasks.push({ id: 'kumayl', name: 'دعاء كميل', type: 'dua' });
 
-            // إضافة الأذكار الثابتة لليوم الحالي
             if (window.dailyDhikr[dayOfWeek]) {
                 window.dailyDhikr[dayOfWeek].forEach(dhikr => {
                     dayTasks.push({ id: dhikr.id, name: dhikr.name, type: 'dhikr' });
                 });
             }
 
-            // جلب الأذكار المخصصة المضافة من قبل المستخدم لهذا اليوم
             if (appData[dateStr]) {
                 Object.keys(appData[dateStr]).forEach(key => {
                     if (key.startsWith('custom_') && key.endsWith('_text')) {
@@ -408,7 +408,6 @@
                 });
             }
 
-            // إنشاء أقسام العرض داخل النافذة
             let mainCount = 0, mustahabCount = 0, dhikrCount = 0;
             const mainDiv = document.createElement('div'); mainDiv.innerHTML = '<div class="section-title" style="margin-top: 5px;">الفرائض (الصلوات الخمس)</div>';
             const mustahabDiv = document.createElement('div'); mustahabDiv.innerHTML = '<div class="section-title">المستحبات والأدعية</div>';
@@ -418,9 +417,7 @@
                 const isCustom = p.type === 'custom_dhikr';
                 const savedState = isCustom ? appData[dateStr][`${p.id}_state`] : appData[dateStr][p.id];
 
-                // إخفاء المستحبات للأيام القديمة (قبل تاريخ بدء التطبيق)
                 if (isFarPast && p.type !== 'fard') return;
-                // إخفاء المستحبات والتسبيحات (بما فيها الصباح وعاشوراء) إذا مر اليوم ولم يتم تسجيلها
                 if (dateStr < todayStr && p.type !== 'fard' && !savedState) return;
 
                 const div = document.createElement('div'); div.className = 'prayer-item';
@@ -457,7 +454,6 @@
                     } else { btnClass += ' qadaa'; btnText = 'قضاء'; clickAction = `window.togglePrayer('${dateStr}', '${p.id}', 'qadaa')`; }
                 }
 
-                // زر حذف التسبيح المخصص
                 if (isCustom) {
                     deleteHtml = `<button class="action-btn qadaa" style="margin-right: 5px; padding: 10px;" onclick="window.deleteCustomDhikr('${dateStr}', '${p.id}')" title="حذف التسبيح">🗑️</button>`;
                 }
@@ -470,18 +466,15 @@
                     </div>
                 `;
 
-                // إضافة العنصر إلى القسم المناسب
                 if (p.type === 'fard') { mainDiv.appendChild(div); mainCount++; }
                 else if (p.type === 'nafl' || p.type === 'dua') { mustahabDiv.appendChild(div); mustahabCount++; }
                 else if (p.type === 'dhikr' || p.type === 'custom_dhikr') { dhikrDiv.appendChild(div); dhikrCount++; }
             });
 
-            // عرض الأقسام إذا كانت تحتوي على عناصر
             if (mainCount > 0) list.appendChild(mainDiv);
             if (mustahabCount > 0) list.appendChild(mustahabDiv);
             if (dhikrCount > 0) list.appendChild(dhikrDiv);
 
-            // إضافة واجهة إدخال تسبيح مخصص أسفل القائمة
             const customDhikrBlock = document.createElement('div');
             customDhikrBlock.innerHTML = `
                 <div style="margin-top: 20px; padding-top: 15px; border-top: 2px dashed #bdc3c7;">
@@ -548,7 +541,6 @@
             const fardPrayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']; const labels = ['الصبح', 'الظهر', 'العصر', 'المغرب', 'العشاء'];
             const adaaData = [0, 0, 0, 0, 0]; const currentQadaaData = [0, 0, 0, 0, 0]; const missedData = [0, 0, 0, 0, 0]; const legacyQadaaData = [0, 0, 0, 0, 0];
             
-            // إضافة زيارة عاشوراء ودعاء الصباح للرسم البياني
             const mustahabLabels = ['الغفيلة', 'الليل', 'دعاء التوسل', 'دعاء كميل', 'زيارة عاشوراء', 'دعاء الصباح'];
             const mustahabData = [0, 0, 0, 0, 0, 0];
 
@@ -563,14 +555,12 @@
                     if (dStr <= todayStr) {
                         hasCurrentData = true;
                         
-                        // إحصائيات الفرائض
                         fardPrayers.forEach((pId, idx) => {
                             let state = appData[dStr] ? appData[dStr][pId] : null;
                             if(state === 'adaa') adaaData[idx]++; else if(state === 'qadaa') currentQadaaData[idx]++;
                             else if(state) adaaData[idx]++; else if(isPrayerMissed(dStr, pId, todayStr, nowMin)) missedData[idx]++;
                         });
 
-                        // إحصائيات المستحبات والأدعية
                         if (appData[dStr]) {
                             if (appData[dStr]['ghufaila'] === 'adaa') mustahabData[0]++;
                             if (appData[dStr]['night'] === 'adaa') mustahabData[1]++;
@@ -591,7 +581,6 @@
                 }
             }
 
-            // رسم الفرائض
             if(currentChartInstance) currentChartInstance.destroy();
             const wrapperCurrent = document.getElementById('current-chart-wrapper');
             if (hasCurrentData) {
@@ -601,7 +590,6 @@
                 });
             } else { wrapperCurrent.style.display = 'none'; }
 
-            // رسم المستحبات والأدعية
             if(mustahabChartInstance) mustahabChartInstance.destroy();
             const wrapperMustahab = document.getElementById('mustahab-chart-wrapper');
             if (hasCurrentData) {
@@ -611,7 +599,6 @@
                 });
             } else { wrapperMustahab.style.display = 'none'; }
 
-            // رسم القضاء المتراكم
             if(legacyChartInstance) legacyChartInstance.destroy();
             const wrapperLegacy = document.getElementById('legacy-chart-wrapper');
             if (hasLegacyData) {
