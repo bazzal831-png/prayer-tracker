@@ -62,7 +62,6 @@
         .chart-container { position: relative; height: 300px; width: 100%; margin-top: 15px; margin-bottom: 30px; }
         .chart-header { text-align: center; margin: 5px 0; color: var(--secondary); font-size: 0.95rem; font-weight: bold; }
         
-        /* شاشات التحميل وتسجيل الدخول */
         #loading-overlay, #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         .loader { border: 5px solid #f3f3f3; border-top: 5px solid var(--accent); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -72,7 +71,6 @@
     </style>
 </head>
 <body>
-    <!-- واجهة تسجيل الدخول -->
     <div id="login-overlay">
         <h1 style="color:var(--primary); margin-bottom: 30px;">مراقب الصلوات 🗓️</h1>
         <p style="margin-bottom: 20px; color: var(--secondary);">يرجى تسجيل الدخول للوصول إلى بياناتك</p>
@@ -81,7 +79,6 @@
         </button>
     </div>
 
-    <!-- واجهة التحميل -->
     <div id="loading-overlay" style="display: none;">
         <div class="loader"></div>
         <h3 style="margin-top:20px; color:var(--primary);">جاري المزامنة مع السحابة...</h3>
@@ -164,13 +161,10 @@
         </div>
     </div>
 
-    <!-- كود فايربيس المدمج مع المصادقة (Auth) - التعديل تم هنا -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        
-        // تم التعديل من signInWithPopup إلى signInWithRedirect
-        import { getAuth, signInWithRedirect, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDKiUhLEJxmamEtimAMCQZG8edlg_8QZyA",
@@ -204,17 +198,14 @@
             { id: 'night', name: 'صلاة الليل', type: 'nafl' }
         ];
 
-        // مراقبة حالة تسجيل الدخول
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // المستخدم مسجل دخول
                 currentUser = user;
                 document.getElementById('login-overlay').style.display = 'none';
                 document.getElementById('loading-overlay').style.display = 'flex';
                 document.getElementById('user-email-display').innerText = `مسجل الدخول كـ: ${user.email}`;
                 await loadData();
             } else {
-                // المستخدم غير مسجل دخول
                 currentUser = null;
                 appData = {};
                 document.getElementById('login-overlay').style.display = 'flex';
@@ -222,10 +213,10 @@
             }
         });
 
-        // التعديل تم هنا (تغيير دالة الدخول)
         window.loginWithGoogle = () => {
-            signInWithRedirect(auth, provider).catch((error) => {
+            signInWithPopup(auth, provider).catch((error) => {
                 alert("فشل تسجيل الدخول: " + error.message);
+                console.error("Auth error:", error);
             });
         };
 
@@ -244,19 +235,17 @@
         async function loadData() {
             if (!currentUser) return;
             try {
-                // جلب بيانات المستخدم المحددة بواسطة الـ UID الخاص به
                 const docRef = doc(db, "Users", currentUser.uid);
                 const docSnap = await getDoc(docRef);
                 
                 if (docSnap.exists()) {
                     appData = docSnap.data().records || {};
                 } else {
-                    // إذا كان حساب جديد، نرفع البيانات المحلية إن وجدت لتسهيل الانتقال
                     let localData = JSON.parse(localStorage.getItem('prayerData_v1'));
                     if (localData && Object.keys(localData).length > 0) {
                         appData = localData;
                         await saveToCloud();
-                        localStorage.removeItem('prayerData_v1'); // مسحها من المحلي بعد الرفع
+                        localStorage.removeItem('prayerData_v1'); 
                     }
                 }
             } catch (error) {
@@ -270,7 +259,6 @@
         async function saveToCloud() {
             if (!currentUser) return;
             try {
-                // حفظ البيانات في مستند خاص بالمستخدم بناءً على رقم حسابه
                 await setDoc(doc(db, "Users", currentUser.uid), { records: appData }, { merge: true });
             } catch (error) {
                 console.error("خطأ في الحفظ السحابي:", error);
