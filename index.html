@@ -28,13 +28,19 @@
         #current-month-display { margin: 0; }
 
         .week-days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; direction: ltr; text-align: center; font-weight: bold; font-size: 0.8rem; color: var(--secondary); padding: 6px 0; background-color: #eef2f5; border-radius: 4px; margin-bottom: 5px; flex-shrink: 0; }
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 5px; direction: ltr; flex-grow: 1; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 5px; direction: ltr; flex-grow: 1; overflow-y: auto; padding-bottom: 5px; }
         .empty-day { visibility: hidden; }
 
-        .day-card { background: white; padding: 5px 2px; border-radius: 6px; text-align: center; cursor: pointer; box-shadow: 0 2px 4px var(--shadow); transition: transform 0.2s; border: 2px solid transparent; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; box-sizing: border-box; }
+        .day-card { background: white; padding: 5px 2px; border-radius: 6px; text-align: center; cursor: pointer; box-shadow: 0 2px 4px var(--shadow); transition: transform 0.2s; border: 2px solid transparent; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; box-sizing: border-box; position: relative; overflow: hidden; }
         .day-card h3 { margin: 2px 0 0 0; font-size: 0.9rem; }
-        .day-card:hover { transform: scale(1.05); border-color: var(--accent); }
+        .day-card:hover { transform: scale(1.05); border-color: var(--accent); z-index: 2; }
         .day-card.today { background-color: #e8f4f8; border-color: var(--accent); }
+
+        /* تنسيقات الشارات الجديدة (المناسبات والأدعية) */
+        .badges-container { display: flex; flex-direction: column; gap: 2px; margin-top: auto; width: 95%; box-sizing: border-box; padding-top: 4px; }
+        .event-badge { font-size: 0.55rem; color: white; padding: 2px 3px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; text-align: center; font-weight: bold; }
+        .badge-dua { background-color: #8e44ad; } /* لون الأدعية */
+        .badge-event { background-color: #16a085; } /* لون المناسبات */
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 20px; border-radius: 10px; width: 95%; max-width: 650px; max-height: 85vh; overflow-y: auto; }
@@ -160,9 +166,14 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        // التعديل هنا: استيراد أدوات التخزين المحلي والعمل دون إنترنت
         import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+        // مسح الذاكرة المخبئية مرة واحدة لفرض تحديث التواريخ الهجرية
+        if (localStorage.getItem('cacheVersion') !== '2') {
+            localStorage.removeItem('baalbekTimingsCache');
+            localStorage.setItem('cacheVersion', '2');
+        }
 
         const firebaseConfig = {
             apiKey: "AIzaSyDKiUhLEJxmamEtimAMCQZG8edlg_8QZyA",
@@ -174,12 +185,9 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        
-        // التعديل هنا: تفعيل المزامنة المحلية وقاعدة البيانات التي تعمل بدون إنترنت
         const db = initializeFirestore(app, {
             localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
         });
-        
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
 
@@ -201,7 +209,24 @@
             { id: 'night', name: 'صلاة الليل', type: 'nafl' }
         ];
 
-        // التحقق من حالة الإنترنت وعرض مؤشر إذا كان المستخدم غير متصل
+        // قائمة المناسبات الهجرية بصيغة (شهر-يوم) لتتطابق مع الـ API
+        const hijriEvents = {
+            "1-10": "عاشوراء",
+            "2-20": "الأربعين",
+            "2-28": "وفاة النبي (ص)",
+            "3-17": "ولادة النبي (ص)",
+            "6-3": "شهادة الزهراء (ع)",
+            "7-13": "ولادة الإمام علي (ع)",
+            "7-27": "المبعث النبوي",
+            "8-15": "ولادة المهدي (عج)",
+            "9-19": "جرح الإمام علي (ع)",
+            "9-21": "شهادة الإمام علي (ع)",
+            "10-1": "عيد الفطر",
+            "12-9": "يوم عرفة",
+            "12-10": "عيد الأضحى",
+            "12-18": "عيد الغدير"
+        };
+
         function updateOnlineStatus() {
             const indicator = document.getElementById('offline-indicator');
             if (navigator.onLine) {
@@ -253,7 +278,7 @@
             if (!cachedTimings[cacheKey]) {
                 if (!navigator.onLine) {
                     console.log("أنت غير متصل بالإنترنت، سيتم عرض الأيام بدون مواقيت حتى يتوفر الاتصال.");
-                    return; // لا نحاول جلب البيانات إذا لم يكن هناك إنترنت لتجنب التعليق
+                    return; 
                 }
                 
                 document.getElementById('loading-overlay').style.display = 'flex';
@@ -270,13 +295,18 @@
                             
                             const cleanTime = (timeStr) => timeStr.split(' ')[0];
                             
+                            // إضافة التاريخ الهجري إلى الذاكرة المخبئية لاستخدامه في المناسبات
+                            const hMonth = dayData.date.hijri.month.number;
+                            const hDay = parseInt(dayData.date.hijri.day, 10);
+                            
                             cachedTimings[cacheKey][dateStr] = {
                                 fajr: cleanTime(t.Fajr),
                                 sunrise: cleanTime(t.Sunrise),
                                 dhuhr: cleanTime(t.Dhuhr),
                                 asr: cleanTime(t.Asr),
                                 maghrib: cleanTime(t.Maghrib),
-                                isha: cleanTime(t.Isha)
+                                isha: cleanTime(t.Isha),
+                                hijriDate: `${hMonth}-${hDay}`
                             };
                         });
                         localStorage.setItem('baalbekTimingsCache', JSON.stringify(cachedTimings));
@@ -291,8 +321,6 @@
             if (!currentUser) return;
             try {
                 const docRef = doc(db, "Users", currentUser.uid);
-                
-                // بفضل تفعيل الأوفلاين، هذا الأمر سيقرأ من جهازك فورا إذا لم يكن هناك إنترنت!
                 const docSnap = await getDoc(docRef);
                 
                 if (docSnap.exists()) {
@@ -308,10 +336,8 @@
             renderCalendar();
         }
 
-        // التعديل هنا: إزالة await لكي يعمل التطبيق كـ"الواتساب" (يسجل فورا ويرسل للسحابة بالخلفية)
         function saveToCloud() {
             if (!currentUser) return;
-            // يتم الحفظ محلياً فوراً، وستقوم Firebase بجدولة الإرسال للسحابة متى توفر الإنترنت
             setDoc(doc(db, "Users", currentUser.uid), { records: appData }, { merge: true })
                 .then(() => console.log("تمت المزامنة بنجاح في الخلفية"))
                 .catch(err => console.error("خطأ في المزامنة:", err));
@@ -325,16 +351,41 @@
         function renderCalendar() {
             document.getElementById('current-month-display').innerText = `${monthNamesEn[currentViewMonth - 1]} ${currentViewYear}`;
             const grid = document.getElementById('calendar-grid'); grid.innerHTML = '';
+            
             const firstDayIndex = new Date(currentViewYear, currentViewMonth - 1, 1).getDay();
-            for (let j = 0; j < firstDayIndex; j++) { const emptyCard = document.createElement('div'); emptyCard.className = 'empty-day'; grid.appendChild(emptyCard); }
+            for (let j = 0; j < firstDayIndex; j++) { 
+                const emptyCard = document.createElement('div'); emptyCard.className = 'empty-day'; grid.appendChild(emptyCard); 
+            }
+            
             const daysInMonth = new Date(currentViewYear, currentViewMonth, 0).getDate();
             const todayStr = formatDate(new Date());
+            const cacheMonthKey = `${currentViewYear}-${currentViewMonth}`;
 
             for (let i = 1; i <= daysInMonth; i++) {
                 const dayStr = `${currentViewYear}-${String(currentViewMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
                 const card = document.createElement('div'); card.className = 'day-card';
                 if (dayStr === todayStr) card.classList.add('today');
-                card.innerHTML = `<h3>${i}</h3>`;
+                
+                // حساب يوم الأسبوع (0 = الأحد، 1 = الإثنين، 2 = الثلاثاء ... 4 = الخميس)
+                const dayOfWeek = new Date(currentViewYear, currentViewMonth - 1, i).getDay();
+                let badgesHtml = '';
+
+                // إضافة شارات الأدعية الأسبوعية
+                if (dayOfWeek === 2) { // الثلاثاء
+                    badgesHtml += `<div class="event-badge badge-dua" title="دعاء التوسل">التوسل</div>`;
+                } else if (dayOfWeek === 4) { // الخميس
+                    badgesHtml += `<div class="event-badge badge-dua" title="دعاء كميل">كميل</div>`;
+                }
+
+                // إضافة شارات المناسبات الهجرية
+                if (cachedTimings[cacheMonthKey] && cachedTimings[cacheMonthKey][dayStr] && cachedTimings[cacheMonthKey][dayStr].hijriDate) {
+                    const hDate = cachedTimings[cacheMonthKey][dayStr].hijriDate;
+                    if (hijriEvents[hDate]) {
+                        badgesHtml += `<div class="event-badge badge-event" title="${hijriEvents[hDate]}">${hijriEvents[hDate]}</div>`;
+                    }
+                }
+
+                card.innerHTML = `<h3>${i}</h3><div class="badges-container">${badgesHtml}</div>`;
                 card.onclick = () => window.openDay(dayStr);
                 grid.appendChild(card);
             }
@@ -398,14 +449,12 @@
             document.getElementById('day-modal').style.display = 'flex';
         }
 
-        // التعديل هنا: إزالة await لكي تستجيب الأزرار فوراً حتى بدون إنترنت
         window.togglePrayer = function(dateStr, prayerId, type) {
             appData[dateStr][prayerId] = type;
             window.openDay(dateStr); 
             saveToCloud(); 
         }
 
-        // التعديل هنا أيضاً
         window.removePrayer = function(dateStr, prayerId) {
             if (confirm("هل تريد التراجع وإلغاء تسجيل هذه الصلاة؟")) {
                 delete appData[dateStr][prayerId];
@@ -484,7 +533,6 @@
             if (currentViewMonth > 12) { currentViewMonth = 1; currentViewYear++; }
             if (currentViewMonth < 1) { currentViewMonth = 12; currentViewYear--; }
             
-            // تم التعديل لعدم حجب الشاشة طويلاً إذا لم يكن هناك إنترنت
             if(navigator.onLine) document.getElementById('loading-overlay').style.display = 'flex';
             await fetchAndCacheTimings(currentViewYear, currentViewMonth);
             document.getElementById('loading-overlay').style.display = 'none';
@@ -496,7 +544,7 @@
         window.resetData = function() {
             if(confirm("تحذير خطير: هل تريد مسح بيانات حسابك نهائياً من السحابة؟")) {
                 appData = {};
-                saveToCloud(); // بدون انتظار
+                saveToCloud(); 
                 renderCalendar(); window.closeModal('settings-modal'); alert("تم مسح بيانات حسابك.");
             }
         }
@@ -529,7 +577,6 @@
                 if (remainingCount > 0) { currentMonth--; if (currentMonth === 0) { currentMonth = 12; currentYear--; } }
             }
 
-            // إزالة await لكي يسجل فوراً
             saveToCloud();
             renderCalendar(); generateStats(); 
             alert(`✅ تم تسجيل ${filledCount} صلاة قضاء، سيتم مزامنتها سحابياً!`); countInput.value = ''; 
