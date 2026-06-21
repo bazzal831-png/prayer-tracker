@@ -6,7 +6,6 @@
     <meta name="theme-color" content="#2c3e50">
     <link rel="manifest" href="./manifest.json">
     <title>مراقب الصلوات - بعلبك</title>
-    <!-- استدعاء مكتبة Chart.js للرسوم البيانية -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -17,6 +16,7 @@
             --success: #27ae60;   /* أخضر */
             --danger: #c0392b;    /* أحمر */
             --warning: #e67e22;   /* برتقالي */
+            --purple: #8e44ad;    /* بنفسجي للقضاء القديم */
             --disabled: #95a5a6;  /* رمادي */
             --text-light: #ecf0f1;
             --text-dark: #2c3e50;
@@ -67,7 +67,8 @@
         .styled-input { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: inherit; font-size: 0.95rem; box-sizing: border-box; }
         .flex-row { display: flex; gap: 8px; margin-bottom: 10px; }
 
-        .chart-container { position: relative; height: 350px; width: 100%; margin-top: 15px; }
+        .chart-container { position: relative; height: 300px; width: 100%; margin-top: 15px; margin-bottom: 30px; }
+        .chart-header { text-align: center; margin: 5px 0; color: var(--secondary); font-size: 0.95rem; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -102,10 +103,24 @@
     <div class="modal" id="settings-modal">
         <div class="modal-content">
             <button class="close-btn" onclick="closeModal('settings-modal')">إغلاق</button>
+
+            <div class="section-title">📅 تاريخ بدء استخدام التطبيق</div>
+            <p style="font-size: 0.8rem; color: #7f8c8d; margin-top: -10px;">سيتم فصل الإحصائيات بناءً على هذا التاريخ. ما قبله يُحسب "سجل قضاء قديم" وما بعده يُحسب "تتبع يومي".</p>
+            <div class="flex-row">
+                <input type="date" id="app-start-date" class="styled-input" style="width: 70%;">
+                <button class="settings-btn" style="width: 30%;" onclick="saveStartDate()">حفظ التاريخ</button>
+            </div>
             
             <div class="section-title">📊 إحصائيات شهر <span id="stats-month-name"></span></div>
-            <div class="chart-container">
-                <canvas id="monthlyChart"></canvas>
+            
+            <div id="current-chart-wrapper" class="chart-container" style="display: none;">
+                <div class="chart-header">التتبع اليومي (من تاريخ البدء فصاعداً)</div>
+                <canvas id="currentChart"></canvas>
+            </div>
+
+            <div id="legacy-chart-wrapper" class="chart-container" style="display: none;">
+                <div class="chart-header">سجل القضاء المتراكم (ما قبل تاريخ البدء)</div>
+                <canvas id="legacyChart"></canvas>
             </div>
             
             <div class="section-title">🗓️ مواقيت الصلوات (بعلبك)</div>
@@ -165,14 +180,18 @@
             navigator.serviceWorker.register('./sw.js').catch(err => console.error('SW Error', err));
         }
 
-        const START_DATE_STR = '2026-06-19'; 
+        // تم استبدال الثابت بمتغير ديناميكي يُحفظ في المتصفح
+        let appStartDate = localStorage.getItem('appStartDate') || '2026-06-21'; 
+
         let currentViewMonth = new Date().getMonth() + 1;
         let currentViewYear = new Date().getFullYear();
         const monthNamesEn = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
         let appData = JSON.parse(localStorage.getItem('prayerData_v1')) || {};
         let customTimings = JSON.parse(localStorage.getItem('baalbekTimings')) || {};
-        let statsChart = null;
+        
+        let currentChartInstance = null;
+        let legacyChartInstance = null;
 
         const prayerNames = [
             { id: 'fajr', name: 'الصبح', type: 'fard' },
@@ -190,7 +209,16 @@
             return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
         }
 
-        // تم إصلاح مشكلة رفع نفس الملف
+        function saveStartDate() {
+            const dateVal = document.getElementById('app-start-date').value;
+            if (dateVal) {
+                appStartDate = dateVal;
+                localStorage.setItem('appStartDate', appStartDate);
+                generateStats(); 
+                alert('تم حفظ تاريخ البدء بنجاح! سيتم تحديث الإحصائيات.');
+            }
+        }
+
         function importJSON(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -204,7 +232,7 @@
                 } catch (err) { alert("حدث خطأ في ملف JSON الخاص بالمواقيت."); }
             };
             reader.readAsText(file);
-            event.target.value = ''; // تفريغ حقل الرفع
+            event.target.value = ''; 
         }
 
         function renderCalendar() {
@@ -228,6 +256,13 @@
             }
         }
 
+        function getPrayerEndMin(pId, dayTimings) {
+            if (!dayTimings) return 1440; // نهاية اليوم الافتراضية
+            if (pId === 'fajr') return dayTimings['sunrise'] ? timeToMinutes(dayTimings['sunrise']) : (dayTimings['dhuhr'] ? timeToMinutes(dayTimings['dhuhr']) : 1440);
+            if (pId === 'dhuhr' || pId === 'asr') return dayTimings['maghrib'] ? timeToMinutes(dayTimings['maghrib']) : 1440;
+            return 1440; // المغرب والعشاء لا يعتبران فائتين حتى نهاية اليوم بالكامل
+        }
+
         function openDay(dateStr) {
             const list = document.getElementById('prayers-list');
             document.getElementById('modal-date-title').innerText = `صلوات يوم: ${dateStr}`;
@@ -240,13 +275,14 @@
 
             const isFutureDay = dateStr > todayStr;
             const isToday = dateStr === todayStr;
-            const isFarPast = dateStr < START_DATE_STR;
+            const isFarPast = dateStr < appStartDate; // تم استخدام تاريخ البدء الديناميكي
 
             if (!appData[dateStr]) appData[dateStr] = {};
 
             prayerNames.forEach(p => {
                 const savedState = appData[dateStr][p.id]; 
                 
+                // إخفاء النوافل للأيام التي تسبق تاريخ البدء
                 if (isFarPast && p.type === 'nafl') return;
                 if (dateStr < todayStr && p.type === 'nafl' && !savedState) return;
 
@@ -270,14 +306,7 @@
                     if (dayTimings[logicKey]) {
                         startMin = timeToMinutes(dayTimings[logicKey]);
                     }
-                    
-                    if (p.id === 'fajr') {
-                        endMin = dayTimings['sunrise'] ? timeToMinutes(dayTimings['sunrise']) : (dayTimings['dhuhr'] ? timeToMinutes(dayTimings['dhuhr']) : 1440);
-                    } else if (p.id === 'dhuhr' || p.id === 'asr') {
-                        endMin = dayTimings['maghrib'] ? timeToMinutes(dayTimings['maghrib']) : 1440;
-                    } else {
-                        endMin = 1440; 
-                    }
+                    endMin = getPrayerEndMin(p.id, dayTimings);
                 }
 
                 let btnClass = 'action-btn'; let btnText = ''; let clickAction = ''; let disabled = false;
@@ -330,68 +359,106 @@
             }
         }
 
-        // تم الإصلاح: تجاهل الأيام التي تسبق تاريخ بدء التطبيق
+        // دالة مساعدة لتحديد ما إذا كانت الصلاة فائتة فعلاً أم لم يحن وقتها / قيد الانتظار لليوم الحالي
+        function isPrayerMissed(dateStr, pId, todayStr, nowMin) {
+            if (dateStr > todayStr) return false;
+            if (dateStr < todayStr) return true; 
+            
+            // إذا كان اليوم هو نفس تاريخ اليوم، نتحقق من الوقت
+            const dayTimings = customTimings[dateStr] || null;
+            if (!dayTimings) return false; // إذا لم تكن هناك مواقيت دقيقة، لا نعتبرها فائتة حتى ينتهي اليوم
+
+            const endMin = getPrayerEndMin(pId, dayTimings);
+            return nowMin > endMin;
+        }
+
         function generateStats() {
             document.getElementById('stats-month-name').innerText = monthNamesEn[currentViewMonth - 1];
+            document.getElementById('app-start-date').value = appStartDate;
             
             const fardPrayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
             const labels = ['الصبح', 'الظهر', 'العصر', 'المغرب', 'العشاء'];
             
-            const adaaData = [];
-            const qadaaData = [];
-            const missedData = [];
+            // بيانات ما بعد تاريخ البدء (التتبع الحالي)
+            const adaaData = [0, 0, 0, 0, 0];
+            const currentQadaaData = [0, 0, 0, 0, 0];
+            const missedData = [0, 0, 0, 0, 0];
 
-            const todayStr = formatDate(new Date());
+            // بيانات ما قبل تاريخ البدء (القضاء القديم)
+            const legacyQadaaData = [0, 0, 0, 0, 0];
+
+            const todayObj = new Date();
+            const todayStr = formatDate(todayObj);
+            const nowMin = todayObj.getHours() * 60 + todayObj.getMinutes();
             const daysInMonth = new Date(currentViewYear, currentViewMonth, 0).getDate();
 
-            fardPrayers.forEach(pId => {
-                let adaaCount = 0; let qadaaCount = 0; let missedCount = 0;
-                
-                for(let i = 1; i <= daysInMonth; i++) {
-                    const dStr = `${currentViewYear}-${String(currentViewMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-                    
-                    // الشرط المعدل: يجب أن يكون التاريخ من تاريخ بدء التطبيق فصاعداً وحتى اليوم الحالي
-                    if(dStr >= START_DATE_STR && dStr <= todayStr) {
-                        let state = appData[dStr] ? appData[dStr][pId] : null;
-                        if(state === 'adaa') adaaCount++;
-                        else if(state === 'qadaa') qadaaCount++;
-                        else if(state) adaaCount++; 
-                        else missedCount++;
-                    }
-                }
-                adaaData.push(adaaCount);
-                qadaaData.push(qadaaCount);
-                missedData.push(missedCount);
-            });
+            let hasCurrentData = false;
+            let hasLegacyData = false;
 
-            const ctx = document.getElementById('monthlyChart').getContext('2d');
-            
-            if(statsChart) {
-                statsChart.destroy(); 
+            for(let i = 1; i <= daysInMonth; i++) {
+                const dStr = `${currentViewYear}-${String(currentViewMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                
+                if (dStr >= appStartDate) {
+                    if (dStr <= todayStr) {
+                        hasCurrentData = true;
+                        fardPrayers.forEach((pId, idx) => {
+                            let state = appData[dStr] ? appData[dStr][pId] : null;
+                            if(state === 'adaa') adaaData[idx]++;
+                            else if(state === 'qadaa') currentQadaaData[idx]++;
+                            else if(state) adaaData[idx]++; 
+                            else if(isPrayerMissed(dStr, pId, todayStr, nowMin)) missedData[idx]++;
+                        });
+                    }
+                } else {
+                    hasLegacyData = true;
+                    fardPrayers.forEach((pId, idx) => {
+                        let state = appData[dStr] ? appData[dStr][pId] : null;
+                        if(state === 'qadaa' || state === 'adaa') legacyQadaaData[idx]++;
+                    });
+                }
             }
 
-            statsChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: 'في وقتها (أداء)', data: adaaData, backgroundColor: '#27ae60' },
-                        { label: 'تم قضاؤها', data: qadaaData, backgroundColor: '#e67e22' },
-                        { label: 'فائتة (لم تُصلَّ)', data: missedData, backgroundColor: '#c0392b' }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: { stacked: false },
-                        y: { stacked: false, beginAtZero: true, ticks: { stepSize: 1 } }
+            // رسم بياني 1: التتبع الحالي
+            if(currentChartInstance) currentChartInstance.destroy();
+            const wrapperCurrent = document.getElementById('current-chart-wrapper');
+            if (hasCurrentData) {
+                wrapperCurrent.style.display = 'block';
+                const ctxCurrent = document.getElementById('currentChart').getContext('2d');
+                currentChartInstance = new Chart(ctxCurrent, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'في وقتها (أداء)', data: adaaData, backgroundColor: '#27ae60' },
+                            { label: 'تم قضاؤها', data: currentQadaaData, backgroundColor: '#e67e22' },
+                            { label: 'فائتة (لم تُصلَّ)', data: missedData, backgroundColor: '#c0392b' }
+                        ]
                     },
-                    plugins: {
-                        legend: { position: 'top', labels: { font: { family: 'Segoe UI' } } }
-                    }
-                }
-            });
+                    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+                });
+            } else {
+                wrapperCurrent.style.display = 'none';
+            }
+
+            // رسم بياني 2: القضاء المتراكم القديم
+            if(legacyChartInstance) legacyChartInstance.destroy();
+            const wrapperLegacy = document.getElementById('legacy-chart-wrapper');
+            if (hasLegacyData) {
+                wrapperLegacy.style.display = 'block';
+                const ctxLegacy = document.getElementById('legacyChart').getContext('2d');
+                legacyChartInstance = new Chart(ctxLegacy, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'قضاء لأيام قديمة (إنجاز متراكم)', data: legacyQadaaData, backgroundColor: '#8e44ad' }
+                        ]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+                });
+            } else {
+                wrapperLegacy.style.display = 'none';
+            }
         }
 
         function changeMonth(step) {
@@ -423,7 +490,6 @@
 
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         
-        // تم الإصلاح: منع تعبئة قضاء لليوم الحالي (يجب أن يكون القضاء للأمس وما قبله)
         function applyBulkQadaa() {
             const startYear = parseInt(document.getElementById('bulk-year').value);
             const startMonth = parseInt(document.getElementById('bulk-month').value);
@@ -451,7 +517,6 @@
                     if (remainingCount === 0) break; 
                     const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
                     
-                    // الشرط المعدل: تجاهل اليوم الحالي والأيام المستقبلية
                     if (dateStr >= todayStr) continue;
 
                     if (!appData[dateStr]) appData[dateStr] = {};
@@ -505,7 +570,6 @@
             downloadJSON(appData, `MyPrayers_Backup_${today}.json`);
         }
 
-        // تم إصلاح مشكلة رفع نفس الملف
         function importUserData(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -530,7 +594,7 @@
                 } catch (err) { alert("حدث خطأ أثناء قراءة ملف السجلات الشخصية."); }
             };
             reader.readAsText(file);
-            event.target.value = ''; // تفريغ حقل الرفع
+            event.target.value = ''; 
         }
 
         window.onload = () => { renderCalendar(); };
