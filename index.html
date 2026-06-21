@@ -380,8 +380,14 @@
             const isFutureDay = dateStr > todayStr; const isToday = dateStr === todayStr; const isFarPast = dateStr < appStartDate;
             if (!appData[dateStr]) appData[dateStr] = {};
 
-            // دمج الصلوات مع الأدعية والتسبيحات بحسب اليوم
+            // دمج الصلوات مع الأدعية والتسبيحات
             let dayTasks = [...prayerNames];
+            
+            // إضافة المستحبات اليومية (دعاء الصباح وزيارة عاشوراء)
+            dayTasks.push({ id: 'dua_sabah', name: 'دعاء الصباح', type: 'dua' });
+            dayTasks.push({ id: 'ziyarat_ashura', name: 'زيارة عاشوراء', type: 'dua' });
+
+            // إضافة المستحبات المخصصة لأيام محددة
             if (dayOfWeek === 2) dayTasks.push({ id: 'tawassul', name: 'دعاء التوسل', type: 'dua' });
             if (dayOfWeek === 4) dayTasks.push({ id: 'kumayl', name: 'دعاء كميل', type: 'dua' });
 
@@ -402,13 +408,19 @@
                 });
             }
 
+            // إنشاء أقسام العرض داخل النافذة
+            let mainCount = 0, mustahabCount = 0, dhikrCount = 0;
+            const mainDiv = document.createElement('div'); mainDiv.innerHTML = '<div class="section-title" style="margin-top: 5px;">الفرائض (الصلوات الخمس)</div>';
+            const mustahabDiv = document.createElement('div'); mustahabDiv.innerHTML = '<div class="section-title">المستحبات والأدعية</div>';
+            const dhikrDiv = document.createElement('div'); dhikrDiv.innerHTML = '<div class="section-title">التسبيحات والأذكار</div>';
+
             dayTasks.forEach(p => {
                 const isCustom = p.type === 'custom_dhikr';
                 const savedState = isCustom ? appData[dateStr][`${p.id}_state`] : appData[dateStr][p.id];
 
                 // إخفاء المستحبات للأيام القديمة (قبل تاريخ بدء التطبيق)
                 if (isFarPast && p.type !== 'fard') return;
-                // إخفاء المستحبات والتسبيحات إذا مر اليوم ولم يتم تسجيلها (المرونة وعدم التراكم)
+                // إخفاء المستحبات والتسبيحات (بما فيها الصباح وعاشوراء) إذا مر اليوم ولم يتم تسجيلها
                 if (dateStr < todayStr && p.type !== 'fard' && !savedState) return;
 
                 const div = document.createElement('div'); div.className = 'prayer-item';
@@ -434,7 +446,6 @@
                 } else {
                     if (isFutureDay) { disabled = true; btnClass += ' future'; btnText = 'لم يحن'; } 
                     else if (p.type !== 'fard') { 
-                        // أزرار المستحبات والتسبيحات
                         btnClass += ' adaa'; 
                         btnText = (p.type === 'dua' ? 'تمت القراءة' : (p.type === 'dhikr' || isCustom ? 'تم التسبيح' : 'تمت الصلاة')); 
                         clickAction = isCustom ? `window.toggleCustomPrayer('${dateStr}', '${p.id}', 'adaa')` : `window.togglePrayer('${dateStr}', '${p.id}', 'adaa')`; 
@@ -458,8 +469,17 @@
                         ${deleteHtml}
                     </div>
                 `;
-                list.appendChild(div);
+
+                // إضافة العنصر إلى القسم المناسب
+                if (p.type === 'fard') { mainDiv.appendChild(div); mainCount++; }
+                else if (p.type === 'nafl' || p.type === 'dua') { mustahabDiv.appendChild(div); mustahabCount++; }
+                else if (p.type === 'dhikr' || p.type === 'custom_dhikr') { dhikrDiv.appendChild(div); dhikrCount++; }
             });
+
+            // عرض الأقسام إذا كانت تحتوي على عناصر
+            if (mainCount > 0) list.appendChild(mainDiv);
+            if (mustahabCount > 0) list.appendChild(mustahabDiv);
+            if (dhikrCount > 0) list.appendChild(dhikrDiv);
 
             // إضافة واجهة إدخال تسبيح مخصص أسفل القائمة
             const customDhikrBlock = document.createElement('div');
@@ -480,7 +500,6 @@
         window.togglePrayer = function(dateStr, prayerId, type) { appData[dateStr][prayerId] = type; window.openDay(dateStr); saveToCloud(); }
         window.removePrayer = function(dateStr, prayerId) { if (confirm("هل تريد التراجع وإلغاء التسجيل؟")) { delete appData[dateStr][prayerId]; window.openDay(dateStr); saveToCloud(); } }
 
-        // دوال التحكم بالتسبيحات المخصصة
         window.addCustomDhikr = function(dateStr) {
             const input = document.getElementById('custom-dhikr-input');
             const text = input.value.trim();
@@ -529,8 +548,9 @@
             const fardPrayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']; const labels = ['الصبح', 'الظهر', 'العصر', 'المغرب', 'العشاء'];
             const adaaData = [0, 0, 0, 0, 0]; const currentQadaaData = [0, 0, 0, 0, 0]; const missedData = [0, 0, 0, 0, 0]; const legacyQadaaData = [0, 0, 0, 0, 0];
             
-            const mustahabLabels = ['الغفيلة', 'الليل', 'دعاء التوسل', 'دعاء كميل'];
-            const mustahabData = [0, 0, 0, 0];
+            // إضافة زيارة عاشوراء ودعاء الصباح للرسم البياني
+            const mustahabLabels = ['الغفيلة', 'الليل', 'دعاء التوسل', 'دعاء كميل', 'زيارة عاشوراء', 'دعاء الصباح'];
+            const mustahabData = [0, 0, 0, 0, 0, 0];
 
             const todayObj = new Date(); const todayStr = formatDate(todayObj); const nowMin = todayObj.getHours() * 60 + todayObj.getMinutes();
             const daysInMonth = new Date(currentViewYear, currentViewMonth, 0).getDate();
@@ -550,10 +570,12 @@
                             else if(state) adaaData[idx]++; else if(isPrayerMissed(dStr, pId, todayStr, nowMin)) missedData[idx]++;
                         });
 
-                        // إحصائيات المستحبات (تسجيل الإتمام فقط)
+                        // إحصائيات المستحبات والأدعية
                         if (appData[dStr]) {
                             if (appData[dStr]['ghufaila'] === 'adaa') mustahabData[0]++;
                             if (appData[dStr]['night'] === 'adaa') mustahabData[1]++;
+                            if (appData[dStr]['ziyarat_ashura'] === 'adaa') mustahabData[4]++;
+                            if (appData[dStr]['dua_sabah'] === 'adaa') mustahabData[5]++;
                             
                             const dDay = new Date(currentViewYear, currentViewMonth - 1, i).getDay();
                             if (dDay === 2 && appData[dStr]['tawassul'] === 'adaa') mustahabData[2]++;
