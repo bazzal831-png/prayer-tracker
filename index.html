@@ -592,9 +592,10 @@
             
             if (delayChartInstance) { delayChartInstance.destroy(); }
             
-            const fardIds = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
-            const fardLabels = ['الصبح', 'الظهر', 'العصر', 'المغرب', 'العشاء'];
-            const colors = ['#2980b9', '#f39c12', '#e74c3c', '#8e44ad', '#2c3e50'];
+            // تم التعديل هنا: الاقتصار على الصبح، الظهر، والمغرب فقط
+            const fardIds = ['fajr', 'dhuhr', 'maghrib'];
+            const fardLabels = ['الصبح', 'الظهر', 'المغرب'];
+            const colors = ['#2980b9', '#f39c12', '#8e44ad'];
             
             if (isLastDayOfMonth) {
                 titleElement.innerText = "مقارنة التأخير الأسبوعي للشهر (بالساعات)";
@@ -602,7 +603,8 @@
                 
                 const weeksData = []; 
                 const daysInMonth = new Date(y, m, 0).getDate();
-                let currentWeek = { count: 0, delays: [0, 0, 0, 0, 0] };
+                // تم التعديل هنا: المصفوفة تتكون من 3 خانات فقط لتتطابق مع الصلوات الثلاث
+                let currentWeek = { count: 0, delays: [0, 0, 0] };
                 let weekLabels = [];
                 let weekIndex = 1;
                 
@@ -618,7 +620,7 @@
                     if (loopDate.getDay() === 6 || i === daysInMonth) {
                         weekLabels.push(`أسبوع ${weekIndex}`);
                         weeksData.push([...currentWeek.delays]);
-                        currentWeek = { count: 0, delays: [0, 0, 0, 0, 0] };
+                        currentWeek = { count: 0, delays: [0, 0, 0] };
                         weekIndex++;
                     }
                 }
@@ -653,7 +655,8 @@
                     currentDay.setDate(sunday.getDate() + i);
                     const dStr = formatDate(currentDay);
                     
-                    const dailyDelays = [0, 0, 0, 0, 0];
+                    // تم التعديل هنا: المصفوفة تتكون من 3 خانات فقط لتتطابق مع الصلوات الثلاث
+                    const dailyDelays = [0, 0, 0];
                     if (dStr >= appStartDate && dStr <= targetDateStr) {
                         fardIds.forEach((pId, idx) => {
                             const delay = calculateDelay(dStr, pId);
