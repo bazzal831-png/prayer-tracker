@@ -35,6 +35,7 @@
         .day-card h3 { margin: 2px 0 0 0; font-size: 0.9rem; }
         .day-card:hover { transform: scale(1.05); border-color: var(--accent); z-index: 2; }
         .day-card.today { background-color: #e8f4f8; border-color: var(--accent); }
+        .day-card.missing-fard { border-color: var(--warning) !important; border-width: 2px; }
 
         .badges-container { display: flex; flex-direction: column; gap: 2px; margin-top: auto; width: 95%; box-sizing: border-box; padding-top: 4px; }
         .event-badge { font-size: 0.55rem; color: white; padding: 2px; border-radius: 4px; line-height: 1.2; text-align: center; font-weight: bold; white-space: normal; word-wrap: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -118,6 +119,22 @@
             <button class="close-btn" onclick="closeModal('day-modal')">إغلاق</button>
             <h2 id="modal-date-title" style="margin-bottom: 15px;">تفاصيل اليوم</h2>
             <div id="prayers-list"></div>
+            
+            <div id="delay-chart-wrapper" class="chart-container" style="display: none; margin-top: 20px; padding-top: 15px; border-top: 2px dashed #bdc3c7;">
+                <div class="chart-header" id="delay-chart-title" style="color: var(--primary);">مراقبة التأخير عن أول الوقت</div>
+                <canvas id="delayChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="time-prompt-modal" style="z-index: 1100;">
+        <div class="modal-content" style="max-width: 350px; text-align: center;">
+            <h3 style="margin-bottom: 15px; color: var(--primary);">متى أديت الصلاة؟</h3>
+            <button class="settings-btn adaa" style="width: 100%; margin-bottom: 15px;" onclick="saveAdaaTime('now')">الآن (الوقت الحالي)</button>
+            <div style="margin: 15px 0; color: #7f8c8d; font-size: 0.9rem;">أو حدد الوقت الفعلي:</div>
+            <input type="time" id="custom-adaa-time" class="styled-input" style="width: 100%; margin-bottom: 15px; text-align: center; direction: ltr;">
+            <button class="settings-btn" style="width: 100%; margin-bottom: 10px; background-color: var(--primary);" onclick="saveAdaaTime('custom')">حفظ الوقت المعدل</button>
+            <button class="settings-btn" style="width: 100%; background-color: var(--danger);" onclick="closeModal('time-prompt-modal')">إلغاء</button>
         </div>
     </div>
 
@@ -202,6 +219,7 @@
         let currentChartInstance = null; 
         let mustahabChartInstance = null;
         let legacyChartInstance = null;
+        let delayChartInstance = null;
 
         const prayerNames = [
             { id: 'fajr', name: 'الصبح', type: 'fard' }, { id: 'dhuhr', name: 'الظهر', type: 'fard' },
@@ -211,13 +229,13 @@
         ];
 
         window.dailyDhikr = {
-            0: [ { id: 'dhikr_sun_1', name: '📿 يا فتاح (489)' }, { id: 'dhikr_sun_2', name: '📿 يا ذا الجلال والإكرام (100)' } ], // الأحد
-            1: [ { id: 'dhikr_mon_1', name: '📿 يا لطيف (129)' }, { id: 'dhikr_mon_2', name: '📿 يا قاضي الحاجات (100)' } ], // الاثنين
-            2: [ { id: 'dhikr_tue_1', name: '📿 يا قابض (903)' }, { id: 'dhikr_tue_2', name: '📿 يا أرحم الراحمين (100)' } ], // الثلاثاء
-            3: [ { id: 'dhikr_wed_1', name: '📿 يا متعال (541)' }, { id: 'dhikr_wed_2', name: '📿 يا حي يا قيوم (100)' } ], // الأربعاء
-            4: [ { id: 'dhikr_thu_1', name: '📿 يا رزاق (308)' }, { id: 'dhikr_thu_2', name: '📿 لا إله إلا الله الحق المبين (100)' } ], // الخميس
-            5: [ { id: 'dhikr_fri_1', name: '📿 يا نور (256)' }, { id: 'dhikr_fri_2', name: '📿 اللهم صل على محمد وآل محمد وعجل فرجهم (100)' } ], // الجمعة
-            6: [ { id: 'dhikr_sat_1', name: '📿 يا غني (106)' }, { id: 'dhikr_sat_2', name: '📿 يا رب العالمين (100)' } ]  // السبت
+            0: [ { id: 'dhikr_sun_1', name: '📿 يا فتاح (489)' }, { id: 'dhikr_sun_2', name: '📿 يا ذا الجلال والإكرام (100)' } ],
+            1: [ { id: 'dhikr_mon_1', name: '📿 يا لطيف (129)' }, { id: 'dhikr_mon_2', name: '📿 يا قاضي الحاجات (100)' } ],
+            2: [ { id: 'dhikr_tue_1', name: '📿 يا قابض (903)' }, { id: 'dhikr_tue_2', name: '📿 يا أرحم الراحمين (100)' } ],
+            3: [ { id: 'dhikr_wed_1', name: '📿 يا متعال (541)' }, { id: 'dhikr_wed_2', name: '📿 يا حي يا قيوم (100)' } ],
+            4: [ { id: 'dhikr_thu_1', name: '📿 يا رزاق (308)' }, { id: 'dhikr_thu_2', name: '📿 لا إله إلا الله الحق المبين (100)' } ],
+            5: [ { id: 'dhikr_fri_1', name: '📿 يا نور (256)' }, { id: 'dhikr_fri_2', name: '📿 اللهم صل على محمد وآل محمد وعجل فرجهم (100)' } ],
+            6: [ { id: 'dhikr_sat_1', name: '📿 يا غني (106)' }, { id: 'dhikr_sat_2', name: '📿 يا رب العالمين (100)' } ]
         };
 
         const hijriEvents = {
@@ -303,20 +321,14 @@
             renderCalendar();
         }
 
-        // ==========================================
-        // التعديل هنا: إزالة { merge: true }
-        // لكي تتم الكتابة فوق البيانات القديمة 
-        // وتُحذف العناصر التي قمت بمسحها بشكل فعلي
-        // ==========================================
         function saveToCloud() {
             if (!currentUser) return;
-            // استبدال كامل للبيانات بدون خاصية الدمج
             setDoc(doc(db, "Users", currentUser.uid), { records: appData }).catch(err => console.error("خطأ:", err));
         }
 
         window.saveStartDate = function() {
             const dateVal = document.getElementById('app-start-date').value;
-            if (dateVal) { appStartDate = dateVal; localStorage.setItem('appStartDate', appStartDate); generateStats(); alert('تم الحفظ!'); }
+            if (dateVal) { appStartDate = dateVal; localStorage.setItem('appStartDate', appStartDate); generateStats(); alert('تم الحفظ!'); renderCalendar(); }
         }
 
         function renderCalendar() {
@@ -332,11 +344,26 @@
             const todayStr = formatDate(new Date());
             const cacheMonthKey = `${currentViewYear}-${currentViewMonth}`;
 
+            const fardIds = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+
             for (let i = 1; i <= daysInMonth; i++) {
                 const dayStr = `${currentViewYear}-${String(currentViewMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
                 const card = document.createElement('div'); card.className = 'day-card';
                 if (dayStr === todayStr) card.classList.add('today');
                 
+                // --- نظام الفلترة لتحديد نقص الصلوات ---
+                let isMissing = false;
+                if (dayStr >= appStartDate && dayStr < todayStr) {
+                    for (let fId of fardIds) {
+                        if (!appData[dayStr] || !appData[dayStr][fId]) {
+                            isMissing = true;
+                            break;
+                        }
+                    }
+                }
+                if (isMissing) card.classList.add('missing-fard');
+                // ----------------------------------------
+
                 const dayOfWeek = new Date(currentViewYear, currentViewMonth - 1, i).getDay();
                 let badgesHtml = '';
 
@@ -360,6 +387,37 @@
             if (pId === 'dhuhr' || pId === 'asr') return dayTimings['maghrib'] ? timeToMinutes(dayTimings['maghrib']) : 1440;
             return 1440; 
         }
+
+        // --- نظام إدخال وقت الأداء الفعلي ---
+        let pendingAdaa = { dateStr: '', prayerId: '' };
+        window.promptAdaaTime = function(dateStr, prayerId) {
+            pendingAdaa = { dateStr, prayerId };
+            const now = new Date();
+            document.getElementById('custom-adaa-time').value = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('time-prompt-modal').style.display = 'flex';
+        };
+
+        window.saveAdaaTime = function(mode) {
+            let timeStr = '';
+            if (mode === 'now') {
+                const now = new Date();
+                timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+            } else {
+                timeStr = document.getElementById('custom-adaa-time').value;
+            }
+            if (!timeStr) return;
+            
+            const { dateStr, prayerId } = pendingAdaa;
+            if (!appData[dateStr]) appData[dateStr] = {};
+            appData[dateStr][prayerId] = 'adaa';
+            appData[dateStr][prayerId + '_time'] = timeStr; // حفظ الوقت لعملية الرسم البياني
+            
+            saveToCloud();
+            closeModal('time-prompt-modal');
+            window.openDay(dateStr);
+            renderCalendar(); // لإزالة الإطار التحذيري إذا اكتمل اليوم
+        };
+        // --------------------------------------
 
         window.openDay = function(dateStr) {
             const list = document.getElementById('prayers-list');
@@ -449,7 +507,10 @@
                     }
                     else if (isToday) {
                         if (startMin !== -1 && nowMin < startMin) { disabled = true; btnClass += ' future'; btnText = 'لم يحن'; } 
-                        else if (startMin !== -1 && nowMin <= endMin) { btnClass += ' adaa'; btnText = 'أداء'; clickAction = `window.togglePrayer('${dateStr}', '${p.id}', 'adaa')`; } 
+                        else if (startMin !== -1 && nowMin <= endMin) { 
+                            btnClass += ' adaa'; btnText = 'أداء'; 
+                            clickAction = `window.promptAdaaTime('${dateStr}', '${p.id}')`; 
+                        } 
                         else { btnClass += ' qadaa'; btnText = 'قضاء'; clickAction = `window.togglePrayer('${dateStr}', '${p.id}', 'qadaa')`; }
                     } else { btnClass += ' qadaa'; btnText = 'قضاء'; clickAction = `window.togglePrayer('${dateStr}', '${p.id}', 'qadaa')`; }
                 }
@@ -487,11 +548,153 @@
             `;
             list.appendChild(customDhikrBlock);
 
+            renderDelayChart(dateStr); // تشغيل خوارزمية الرسم البياني هنا
+            
             document.getElementById('day-modal').style.display = 'flex';
         }
 
-        window.togglePrayer = function(dateStr, prayerId, type) { appData[dateStr][prayerId] = type; window.openDay(dateStr); saveToCloud(); }
-        window.removePrayer = function(dateStr, prayerId) { if (confirm("هل تريد التراجع وإلغاء التسجيل؟")) { delete appData[dateStr][prayerId]; window.openDay(dateStr); saveToCloud(); } }
+        // --- نظام حساب ورسم أوقات التأخير ---
+        function calculateDelay(dateStr, prayerId) {
+            if (!appData[dateStr] || appData[dateStr][prayerId] !== 'adaa') return null; 
+            
+            const actualTimeStr = appData[dateStr][prayerId + '_time'];
+            if (!actualTimeStr) return null; // استثناء البيانات القديمة التي لا تحتوي على وقت
+            
+            const [y, m, d] = dateStr.split('-');
+            const cacheMonthKey = `${parseInt(y)}-${parseInt(m)}`;
+            const dayTimings = cachedTimings[cacheMonthKey] ? cachedTimings[cacheMonthKey][dateStr] : null;
+            if (!dayTimings) return null;
+            
+            let logicKey = prayerId; 
+            if (prayerId === 'asr') logicKey = 'dhuhr'; 
+            if (prayerId === 'isha') logicKey = 'maghrib'; 
+            
+            const adhanTimeStr = dayTimings[logicKey];
+            if (!adhanTimeStr) return null;
+            
+            const actualMin = timeToMinutes(actualTimeStr);
+            const adhanMin = timeToMinutes(adhanTimeStr);
+            
+            let diff = actualMin - adhanMin;
+            if (diff < 0) diff = 0; 
+            return diff;
+        }
+
+        function renderDelayChart(targetDateStr) {
+            const [y, m, d] = targetDateStr.split('-').map(Number);
+            const targetDate = new Date(y, m - 1, d);
+            
+            const nextDay = new Date(y, m - 1, d + 1);
+            const isLastDayOfMonth = nextDay.getDate() === 1;
+
+            const wrapper = document.getElementById('delay-chart-wrapper');
+            const titleElement = document.getElementById('delay-chart-title');
+            
+            if (delayChartInstance) { delayChartInstance.destroy(); }
+            
+            const fardIds = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+            const fardLabels = ['الصبح', 'الظهر', 'العصر', 'المغرب', 'العشاء'];
+            const colors = ['#2980b9', '#f39c12', '#e74c3c', '#8e44ad', '#2c3e50'];
+            
+            if (isLastDayOfMonth) {
+                titleElement.innerText = "مقارنة التأخير الأسبوعي للشهر (بالساعات)";
+                wrapper.style.display = 'block';
+                
+                const weeksData = []; 
+                const daysInMonth = new Date(y, m, 0).getDate();
+                let currentWeek = { count: 0, delays: [0, 0, 0, 0, 0] };
+                let weekLabels = [];
+                let weekIndex = 1;
+                
+                for(let i=1; i<=daysInMonth; i++) {
+                    const dStr = `${y}-${String(m).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    const loopDate = new Date(y, m - 1, i);
+                    
+                    fardIds.forEach((pId, idx) => {
+                        const delay = calculateDelay(dStr, pId);
+                        if(delay !== null) currentWeek.delays[idx] += delay;
+                    });
+                    
+                    if (loopDate.getDay() === 6 || i === daysInMonth) {
+                        weekLabels.push(`أسبوع ${weekIndex}`);
+                        weeksData.push([...currentWeek.delays]);
+                        currentWeek = { count: 0, delays: [0, 0, 0, 0, 0] };
+                        weekIndex++;
+                    }
+                }
+                
+                const datasets = fardIds.map((pId, idx) => {
+                    return {
+                        label: fardLabels[idx],
+                        data: weeksData.map(week => (week[idx] / 60).toFixed(2)),
+                        borderColor: colors[idx], backgroundColor: colors[idx],
+                        fill: false, tension: 0.1
+                    };
+                });
+                
+                delayChartInstance = new Chart(document.getElementById('delayChart').getContext('2d'), {
+                    type: 'line', data: { labels: weekLabels, datasets: datasets },
+                    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, title: { display: true, text: 'ساعات التأخير' } } } }
+                });
+
+            } else {
+                titleElement.innerText = "مراقبة التأخير الأسبوعي (بالساعات)";
+                wrapper.style.display = 'block';
+                
+                const dayOfWeek = targetDate.getDay();
+                const sunday = new Date(targetDate);
+                sunday.setDate(targetDate.getDate() - dayOfWeek);
+                
+                const dayLabels = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+                const daysData = []; 
+                
+                for(let i=0; i<7; i++) {
+                    const currentDay = new Date(sunday);
+                    currentDay.setDate(sunday.getDate() + i);
+                    const dStr = formatDate(currentDay);
+                    
+                    const dailyDelays = [0, 0, 0, 0, 0];
+                    if (dStr >= appStartDate && dStr <= targetDateStr) {
+                        fardIds.forEach((pId, idx) => {
+                            const delay = calculateDelay(dStr, pId);
+                            if(delay !== null) dailyDelays[idx] = delay;
+                        });
+                    }
+                    daysData.push(dailyDelays);
+                }
+                
+                const datasets = fardIds.map((pId, idx) => {
+                    return {
+                        label: fardLabels[idx],
+                        data: daysData.map(day => (day[idx] / 60).toFixed(2)),
+                        borderColor: colors[idx], backgroundColor: colors[idx],
+                        fill: false, tension: 0.1
+                    };
+                });
+
+                delayChartInstance = new Chart(document.getElementById('delayChart').getContext('2d'), {
+                    type: 'line', data: { labels: dayLabels, datasets: datasets },
+                    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, title: { display: true, text: 'ساعات التأخير' } } } }
+                });
+            }
+        }
+        // --------------------------------------
+
+        window.togglePrayer = function(dateStr, prayerId, type) { 
+            appData[dateStr][prayerId] = type; 
+            window.openDay(dateStr); 
+            saveToCloud(); 
+            renderCalendar(); // تحديث التقويم الخارجي
+        }
+        window.removePrayer = function(dateStr, prayerId) { 
+            if (confirm("هل تريد التراجع وإلغاء التسجيل؟")) { 
+                delete appData[dateStr][prayerId]; 
+                delete appData[dateStr][prayerId + '_time']; // إزالة الوقت إذا تم إلغاء الصلاة
+                window.openDay(dateStr); 
+                saveToCloud(); 
+                renderCalendar(); 
+            } 
+        }
 
         window.addCustomDhikr = function(dateStr) {
             const input = document.getElementById('custom-dhikr-input');
